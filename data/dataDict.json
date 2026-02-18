@@ -1,125 +1,153 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.org/schemas/lens_grn_perturbation.schema.json",
-  "title": "Lens GRN Perturbation Record",
-  "description": "Schema for gene regulatory network perturbation records derived from the Lens_GRN_June_2016 dataset.",
+  "$id": "https://example.org/schemas/lens_grn_perturbation_full.schema.json",
+  "title": "Lens GRN Perturbation Record (All Columns)",
+  "description": "Full-column schema for Lens_GRN_June_2016_original dataset sheet Lens_GRN_pert.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "S_No",
     "Regulator",
     "Target",
+    "New_gene_symbol_for_taget",
     "Perturbation",
     "Effect",
+    "Stage",
+    "Context",
+    "Context_2",
+    "Measurement",
+    "Molecule_Analyzed",
     "Species",
-    "Reference"
+    "Tissue_of_regulator",
+    "Tissue_of_target",
+    "Stage_1"
   ],
   "properties": {
     "S_No": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Row identifier or record index from source spreadsheet"
+      "type": ["integer", "null"],
+      "description": "FILL IN WITH DR. LACHE",
+      "source_column_name": "S. No"
     },
     "Regulator": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Gene or factor acting as regulator; may contain multiple comma-separated entries"
+      "type": ["string", "null"],
+      "description": "Regulator gene or factor",
+      "source_column_name": "Regulator"
     },
     "Target": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Reported target gene, process, or phenotype term"
-    },
-    "New_gene_symbol_for_target": {
       "type": ["string", "null"],
-      "description": "Normalized or updated gene symbol for target"
+      "description": "Target gene or process",
+      "source_column_name": "Target"
+    },
+    "New_gene_symbol_for_taget": {
+      "type": ["string", "null"],
+      "description": "Updated or normalized target gene symbol (spelling preserved)",
+      "source_column_name": "New gene symbol for taget"
     },
     "Perturbation": {
-      "type": "string",
-      "description": "Type or direction of perturbation (e.g., knockout, knockdown, overexpression, symbolic notation)"
+      "type": ["string", "null"],
+      "description": "Perturbation type or direction",
+      "source_column_name": "Perturbation"
     },
     "Effect": {
-      "type": "string",
-      "description": "Observed regulatory effect (activation, repression, neutral, symbolic notation)"
+      "type": ["string", "null"],
+      "description": "Observed regulatory effect",
+      "source_column_name": "Effect"
     },
     "Stage": {
       "type": ["string", "null"],
-      "description": "Developmental or experimental stage label"
+      "description": "Developmental or experimental stage",
+      "source_column_name": "Stage"
     },
     "Context": {
       "type": ["string", "null"],
-      "description": "Primary experimental or genetic context"
+      "description": "Primary experimental context",
+      "source_column_name": "Context"
     },
     "Context_2": {
       "type": ["string", "null"],
-      "description": "Secondary or supporting experimental context"
+      "description": "Secondary experimental context",
+      "source_column_name": "Context_2"
     },
     "Measurement": {
       "type": ["string", "null"],
-      "description": "Experimental assay or measurement technique used"
+      "description": "Measurement or assay method",
+      "source_column_name": "Measurement"
     },
     "Molecule_Analyzed": {
       "type": ["string", "null"],
-      "description": "Molecule type measured (e.g., RNA, protein)"
+      "description": "Analyzed molecule type",
+      "source_column_name": "Molecule Analyzed"
     },
     "Species": {
-      "type": "string",
-      "description": "Organism species for the experiment"
+      "type": ["string", "null"],
+      "description": "Species",
+      "source_column_name": "Species"
     },
     "Tissue_of_regulator": {
       "type": ["string", "null"],
-      "description": "Tissue where regulator activity or expression was measured"
+      "description": "Regulator tissue",
+      "source_column_name": "Tissue of regulator"
     },
     "Tissue_of_target": {
       "type": ["string", "null"],
-      "description": "Tissue where target response was measured"
+      "description": "Target tissue",
+      "source_column_name": "Tissue of target"
     },
-    "Stage_secondary": {
+    "Stage_1": {
       "type": ["string", "null"],
-      "description": "Secondary or refined developmental stage annotation"
+      "description": "Secondary stage column",
+      "source_column_name": "Stage.1"
     },
     "Phenotype_1": {
       "type": ["string", "null"],
-      "description": "Primary observed phenotype"
+      "description": "Phenotype field 1",
+      "source_column_name": "Phenotype 1"
     },
     "Phenotype_2": {
       "type": ["string", "null"],
-      "description": "Secondary observed phenotype"
+      "description": "Phenotype field 2",
+      "source_column_name": "Phenotype 2"
     },
     "Phenotype_3": {
       "type": ["string", "null"],
-      "description": "Tertiary observed phenotype"
+      "description": "Phenotype field 3",
+      "source_column_name": "Phenotype 3"
     },
     "Function": {
       "type": ["string", "null"],
-      "description": "Functional category or annotation"
+      "description": "Functional annotation",
+      "source_column_name": "Function"
     },
     "Clinical_Relevant_Phenotype_in_Human": {
       "type": ["string", "null"],
-      "description": "Mapped or related human clinical phenotype"
+      "description": "Related human clinical phenotype",
+      "source_column_name": "Clinical Relevant Phenotype in Human"
     },
     "Reference": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Literature citation text"
+      "type": ["string", "null"],
+      "description": "Literature reference",
+      "source_column_name": "Reference"
     },
     "PMID": {
-      "type": ["integer", "null"],
-      "minimum": 1,
-      "description": "PubMed identifier"
+      "type": ["integer", "string", "null"],
+      "description": "PubMed ID",
+      "source_column_name": "PMID"
     },
     "PMCID": {
       "type": ["string", "null"],
       "pattern": "^PMC[0-9]+$",
-      "description": "PubMed Central identifier"
+      "description": "PubMed Central ID",
+      "source_column_name": "PMCID"
     },
     "TS_of_regulator": {
       "type": ["string", "null"],
-      "description": "Developmental stage or timeseries annotation for regulator"
+      "description": "Time/stage of regulator",
+      "source_column_name": "TS of regulator"
     },
     "TS_of_target": {
       "type": ["string", "null"],
-      "description": "Developmental stage or timeseries annotation for target"
+      "description": "Time/stage of target",
+      "source_column_name": "TS of target"
     }
   }
 }
