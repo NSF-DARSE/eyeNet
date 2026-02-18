@@ -1,1 +1,125 @@
-<json data dictionary.
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/lens_grn_perturbation.schema.json",
+  "title": "Lens GRN Perturbation Record",
+  "description": "Schema for gene regulatory network perturbation records derived from the Lens_GRN_June_2016 dataset.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "S_No",
+    "Regulator",
+    "Target",
+    "Perturbation",
+    "Effect",
+    "Species",
+    "Reference"
+  ],
+  "properties": {
+    "S_No": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Row identifier or record index from source spreadsheet"
+    },
+    "Regulator": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Gene or factor acting as regulator; may contain multiple comma-separated entries"
+    },
+    "Target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reported target gene, process, or phenotype term"
+    },
+    "New_gene_symbol_for_target": {
+      "type": ["string", "null"],
+      "description": "Normalized or updated gene symbol for target"
+    },
+    "Perturbation": {
+      "type": "string",
+      "description": "Type or direction of perturbation (e.g., knockout, knockdown, overexpression, symbolic notation)"
+    },
+    "Effect": {
+      "type": "string",
+      "description": "Observed regulatory effect (activation, repression, neutral, symbolic notation)"
+    },
+    "Stage": {
+      "type": ["string", "null"],
+      "description": "Developmental or experimental stage label"
+    },
+    "Context": {
+      "type": ["string", "null"],
+      "description": "Primary experimental or genetic context"
+    },
+    "Context_2": {
+      "type": ["string", "null"],
+      "description": "Secondary or supporting experimental context"
+    },
+    "Measurement": {
+      "type": ["string", "null"],
+      "description": "Experimental assay or measurement technique used"
+    },
+    "Molecule_Analyzed": {
+      "type": ["string", "null"],
+      "description": "Molecule type measured (e.g., RNA, protein)"
+    },
+    "Species": {
+      "type": "string",
+      "description": "Organism species for the experiment"
+    },
+    "Tissue_of_regulator": {
+      "type": ["string", "null"],
+      "description": "Tissue where regulator activity or expression was measured"
+    },
+    "Tissue_of_target": {
+      "type": ["string", "null"],
+      "description": "Tissue where target response was measured"
+    },
+    "Stage_secondary": {
+      "type": ["string", "null"],
+      "description": "Secondary or refined developmental stage annotation"
+    },
+    "Phenotype_1": {
+      "type": ["string", "null"],
+      "description": "Primary observed phenotype"
+    },
+    "Phenotype_2": {
+      "type": ["string", "null"],
+      "description": "Secondary observed phenotype"
+    },
+    "Phenotype_3": {
+      "type": ["string", "null"],
+      "description": "Tertiary observed phenotype"
+    },
+    "Function": {
+      "type": ["string", "null"],
+      "description": "Functional category or annotation"
+    },
+    "Clinical_Relevant_Phenotype_in_Human": {
+      "type": ["string", "null"],
+      "description": "Mapped or related human clinical phenotype"
+    },
+    "Reference": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Literature citation text"
+    },
+    "PMID": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "PubMed identifier"
+    },
+    "PMCID": {
+      "type": ["string", "null"],
+      "pattern": "^PMC[0-9]+$",
+      "description": "PubMed Central identifier"
+    },
+    "TS_of_regulator": {
+      "type": ["string", "null"],
+      "description": "Developmental stage or timeseries annotation for regulator"
+    },
+    "TS_of_target": {
+      "type": ["string", "null"],
+      "description": "Developmental stage or timeseries annotation for target"
+    }
+  }
+}
