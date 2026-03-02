@@ -551,4 +551,5 @@ if __name__ == "__main__":
     print("  Open in browser:  http://127.0.0.1:8050")
     print("  Stop server:      Ctrl + C")
     print("=" * 60 + "\n")
-    app.run(debug=True, port=8050)
+    server = app.server
+    app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 8050)))
