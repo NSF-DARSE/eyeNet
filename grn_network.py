@@ -415,8 +415,8 @@ def _edge_tooltip(u, v, data, analysis, theme):
     from collections import Counter
     dom_rel  = Counter(relationships).most_common(1)[0][0] if relationships else "no_effect"
     rel_labels = {
-        "activating": f"<span style='color:{WONG[\"green\"]}'>▲ Activating</span>",
-        "inhibiting": f"<span style='color:{WONG[\"vermillion\"]}'>▼ Inhibiting</span>",
+        "activating": f"<span style='color:{WONG["green"]}'>▲ Activating</span>",
+        "inhibiting": f"<span style='color:{WONG["vermillion"]}'>▼ Inhibiting</span>",
         "no_effect":  "<span style='color:#94a3b8'>○ No effect</span>",
     }
     rel_str  = rel_labels.get(dom_rel, dom_rel)
