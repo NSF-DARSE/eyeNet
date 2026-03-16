@@ -372,8 +372,8 @@ def build_layout(theme="dark"):
                                                "border": "none", "flex": "1",
                                                "background": bg, "display": "block"},
                                         srcDoc=f"<div style='color:#64748b;font-family:monospace;"
-                                               f"padding:40px;font-size:14px;background:{bg};height:100%'>"
-                                               f"Click <b style='color:{WONG['sky_blue']}'>▶ Apply Filters</b> "
+                                               f"padding:40px;font-size:14px;background:#0a0e1a;height:100%'>"
+                                               f"Click <b style='color:#56B4E9'>&#9654; Apply Filters</b> "
                                                f"to render the network.</div>",
                                     )
                                 ],
