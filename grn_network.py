@@ -5,11 +5,23 @@ Lens GRN Explorer — NetworkX + Pyvis
 Lachke Lab 2016 — Gene Regulatory Network
 
 SETUP (run once):
-    pip install networkx pyvis pandas openpyxl plotly dash
+    pip install networkx pyvis pandas openpyxl plotly dash dash-bootstrap-components
 
 USAGE:
     python grn_network.py        ← opens grn_output.html in browser
     python app.py                ← runs full Dash app with live filters
+
+KEY BIOLOGY NOTE:
+    The TRUE regulatory relationship requires combining TWO columns:
+        Perturbation: what was done to the regulator (+/- = overexpressed/knocked out)
+        Effect:       what happened to the target   (+/- = increased/decreased, o = no change)
+
+    True relationship = Perturbation × Effect:
+        Pert(-) × Effect(-) → ACTIVATING  (knockout reduces target → reg normally activates)
+        Pert(-) × Effect(+) → INHIBITING  (knockout increases target → reg normally inhibits)
+        Pert(+) × Effect(+) → ACTIVATING  (overexpress increases target → reg activates)
+        Pert(+) × Effect(-) → INHIBITING  (overexpress decreases target → reg inhibits)
+        Any    × Effect(o)  → NO EFFECT
 
 STRUCTURE:
     1. CONFIG         — all tunable settings
@@ -34,6 +46,19 @@ from pyvis.network import Network
 # 1. CONFIG
 # =============================================================================
 
+# --- Wong (2011) Color-Blind Friendly Palette ---
+# Nature Methods standard, safe for all types of color blindness
+WONG = {
+    "black":        "#000000",
+    "orange":       "#E69F00",
+    "sky_blue":     "#56B4E9",
+    "green":        "#009E73",
+    "yellow":       "#F0E442",
+    "blue":         "#0072B2",
+    "vermillion":   "#D55E00",
+    "pink":         "#CC79A7",
+}
+
 CONFIG = {
     # --- File paths ---
     "input_file":  "data/Lens_GRN_June_2016_original FOR HACKATHON - Salil Lachke.xlsx",
@@ -41,47 +66,68 @@ CONFIG = {
     "sheet_name":  "Lens_GRN_pert",
 
     # --- Stage filters ---
-    # Stages: 'E8.0' ... 'E19.5', 'P0' ... 'P665', 'Adult'
-    "stage_from":   None,       # e.g. "E9.5"
-    "stage_to":     None,       # e.g. "E14.5"
-    "stage_single": None,       # e.g. "E12.5" — overrides range if set
+    "stage_from":   None,
+    "stage_to":     None,
+    "stage_single": None,
 
     # --- Gene filters ---
-    "filter_regulator": None,   # e.g. "Pax6"
-    "filter_target":    None,   # e.g. "Prox1"
+    "filter_regulator": None,
+    "filter_target":    None,
 
-    # --- Effect filters ---
-    # "+" = activating, "-" = inhibiting, "o" = no effect
-    "effects_include": ["+", "-", "o"],
+    # --- True relationship filter ---
+    # Options: "activating", "inhibiting", "no_effect" — or all three
+    "relationships_include": ["activating", "inhibiting", "no_effect"],
 
     # --- Graph display ---
     "max_edges":           300,
     "show_feedback_loops": True,
 
-    # --- Node colors ---
-    "color_regulator": "#00d4ff",   # cyan    — regulates others
-    "color_target":    "#ff6b35",   # orange  — regulated by others
-    "color_both":      "#a855f7",   # purple  — regulates AND is regulated
-    "color_selfloop":  "#facc15",   # yellow  — self-regulatory gene
+    # --- Node colors (Wong palette) ---
+    "color_regulator": WONG["sky_blue"],    # sky blue  — regulates others
+    "color_target":    WONG["orange"],      # orange    — regulated by others
+    "color_both":      WONG["pink"],        # pink      — regulates AND is regulated
+    "color_selfloop":  WONG["yellow"],      # yellow    — self-regulatory gene
 
-    # --- Edge colors ---
-    "color_activating": "#22c55e",  # green  — activates target
-    "color_inhibiting": "#ef4444",  # red    — inhibits target
-    "color_noeffect":   "#94a3b8",  # grey   — no effect observed
+    # --- Edge colors (Wong palette) ---
+    "color_activating": WONG["green"],      # green     — activates target
+    "color_inhibiting": WONG["vermillion"], # vermillion — inhibits target
+    "color_noeffect":   "#94a3b8",          # grey      — no effect observed
 
     # --- Node sizing ---
     "node_size_min": 12,
     "node_size_max": 55,
 
     # --- Layout ---
-    # Options: "barnes_hut", "force_atlas_2based", "repulsion", "hierarchical"
     "layout": "barnes_hut",
 
-    # --- Window ---
-    "width":      "100%",
-    "height":     "100vh",
-    "bgcolor":    "#0a0e1a",
-    "font_color": "#ffffff",
+    # --- Theme: "dark" or "light" ---
+    "theme": "dark",
+}
+
+# Theme palettes
+THEMES = {
+    "dark": {
+        "bgcolor":      "#0a0e1a",
+        "font_color":   "#ffffff",
+        "tooltip_bg":   "#0f1525",
+        "tooltip_border": "#1e2d4a",
+        "tooltip_text": "#e2e8f0",
+        "legend_bg":    "#0f1525",
+        "legend_border": "#1e2d4a",
+        "legend_text":  "#e2e8f0",
+        "legend_muted": "#475569",
+    },
+    "light": {
+        "bgcolor":      "#f8fafc",
+        "font_color":   "#0f172a",
+        "tooltip_bg":   "#ffffff",
+        "tooltip_border": "#cbd5e1",
+        "tooltip_text": "#0f172a",
+        "legend_bg":    "#ffffff",
+        "legend_border": "#e2e8f0",
+        "legend_text":  "#0f172a",
+        "legend_muted": "#64748b",
+    },
 }
 
 
@@ -115,14 +161,47 @@ def load_data(config: dict) -> pd.DataFrame:
 
     df["regulator"]    = df["regulator"].astype(str).str.strip()
     df["target"]       = df["target"].astype(str).str.strip()
+    df["perturbation"] = df["perturbation"].astype(str).str.strip()
     df["effect"]       = df["effect"].astype(str).str.strip()
     df["stage"]        = df["stage"].astype(str).str.strip()
     df["context"]      = df["context"].astype(str).str.strip()
-    df["perturbation"] = df["perturbation"].astype(str).str.strip()
+
     df["effect"]       = df["effect"].replace({"nan": "o", "none": "o", "None": "o", "0": "o"})
+    df["perturbation"] = df["perturbation"].replace({"nan": "-", "none": "-", "None": "-"})
+
+    # --- Compute TRUE regulatory relationship ---
+    # Perturbation × Effect → true_relationship
+    df["true_relationship"] = df.apply(_compute_relationship, axis=1)
 
     print(f"       Loaded {len(df):,} edges")
+    rel_counts = df["true_relationship"].value_counts()
+    for rel, cnt in rel_counts.items():
+        print(f"       {rel}: {cnt:,}")
     return df
+
+
+def _compute_relationship(row) -> str:
+    """
+    Compute the true regulatory relationship from perturbation × effect.
+    
+    Logic:
+      Effect = 'o'           → no_effect  (regardless of perturbation)
+      Pert('-') × Effect('-') → activating (knockout reduces target → reg activates)
+      Pert('-') × Effect('+') → inhibiting (knockout increases target → reg inhibits)
+      Pert('+') × Effect('+') → activating (overexpress increases target → reg activates)
+      Pert('+') × Effect('-') → inhibiting (overexpress decreases target → reg inhibits)
+    """
+    pert   = str(row["perturbation"]).strip()
+    effect = str(row["effect"]).strip()
+
+    if effect == "o":
+        return "no_effect"
+
+    # Same sign → activating, opposite sign → inhibiting
+    if pert == effect:
+        return "activating"
+    else:
+        return "inhibiting"
 
 
 # =============================================================================
@@ -144,7 +223,8 @@ def filter_data(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     print(f"[2/5] Applying filters...")
     original = len(df)
 
-    df = df[df["effect"].isin(config["effects_include"])]
+    # Filter by true relationship
+    df = df[df["true_relationship"].isin(config["relationships_include"])]
 
     if config["stage_single"]:
         df = df[df["stage"] == config["stage_single"]]
@@ -188,17 +268,26 @@ def build_graph(df: pd.DataFrame) -> nx.DiGraph:
         G.add_node(node, is_reg=(node in regulators), is_tgt=(node in targets))
 
     for _, row in df.iterrows():
-        reg, tgt = row["regulator"], row["target"]
-        eff, stg = row["effect"], row["stage"]
-        ctx      = row["context"]
+        reg, tgt  = row["regulator"], row["target"]
+        pert, eff = row["perturbation"], row["effect"]
+        stg, ctx  = row["stage"], row["context"]
+        rel       = row["true_relationship"]
 
         if G.has_edge(reg, tgt):
+            G[reg][tgt]["perturbations"].append(pert)
             G[reg][tgt]["effects"].append(eff)
+            G[reg][tgt]["relationships"].append(rel)
             G[reg][tgt]["stages"].append(stg)
             G[reg][tgt]["contexts"].append(ctx)
             G[reg][tgt]["count"] += 1
         else:
-            G.add_edge(reg, tgt, effects=[eff], stages=[stg], contexts=[ctx], count=1)
+            G.add_edge(reg, tgt,
+                       perturbations=[pert],
+                       effects=[eff],
+                       relationships=[rel],
+                       stages=[stg],
+                       contexts=[ctx],
+                       count=1)
 
     print(f"       {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
     return G
@@ -262,24 +351,26 @@ def _node_size(G, node, config):
 
 def _node_color(G, node, analysis, config):
     self_loop_nodes = set(e[0] for e in analysis.get("self_loops", []))
-    if node in self_loop_nodes:       return config["color_selfloop"]
+    if node in self_loop_nodes:   return config["color_selfloop"]
     is_reg = G.nodes[node].get("is_reg", False)
     is_tgt = G.nodes[node].get("is_tgt", False)
-    if is_reg and is_tgt:             return config["color_both"]
-    if is_reg:                        return config["color_regulator"]
+    if is_reg and is_tgt:         return config["color_both"]
+    if is_reg:                    return config["color_regulator"]
     return config["color_target"]
 
 
-def _edge_color(effects, config):
+def _edge_color(relationships, config):
+    """Color based on dominant TRUE relationship."""
     from collections import Counter
-    if not effects: return config["color_noeffect"]
-    dominant = Counter(effects).most_common(1)[0][0]
-    if dominant == "+": return config["color_activating"]
-    if dominant == "-": return config["color_inhibiting"]
+    if not relationships: return config["color_noeffect"]
+    dominant = Counter(relationships).most_common(1)[0][0]
+    if dominant == "activating":  return config["color_activating"]
+    if dominant == "inhibiting":  return config["color_inhibiting"]
     return config["color_noeffect"]
 
 
-def _node_tooltip(node, G, analysis):
+def _node_tooltip(node, G, analysis, theme):
+    t       = THEMES[theme]
     d       = G.nodes[node]
     is_reg  = d.get("is_reg", False)
     is_tgt  = d.get("is_tgt", False)
@@ -295,83 +386,108 @@ def _node_tooltip(node, G, analysis):
     in_feedback = node in analysis.get("feedback_nodes", set())
 
     tip = (
-        f"<div style='font-family:monospace;font-size:13px;padding:8px;min-width:200px'>"
-        f"<b style='font-size:15px;color:#00d4ff'>{node}</b><br/>"
-        f"<hr style='border-color:#334155;margin:6px 0'/>"
+        f"<div style='font-family:monospace;font-size:13px;padding:8px;min-width:200px;"
+        f"background:{t['tooltip_bg']};color:{t['tooltip_text']};border-radius:6px'>"
+        f"<b style='font-size:15px;color:{WONG['sky_blue']}'>{node}</b><br/>"
+        f"<hr style='border-color:{t['tooltip_border']};margin:6px 0'/>"
         f"<b>Role:</b> {role}<br/>"
         f"<b>Regulates (out):</b> {out_deg} genes<br/>"
         f"<b>Regulated by (in):</b> {in_deg} genes<br/>"
         f"<b>Degree centrality:</b> {cent:.3f}<br/>"
     )
     if self_loop:
-        tip += "<br/><span style='color:#facc15'>🔄 Self-regulatory loop</span><br/>"
+        tip += f"<br/><span style='color:{WONG['yellow']}'>🔄 Self-regulatory loop</span><br/>"
     if in_feedback:
-        tip += "<span style='color:#fb923c'>⚡ Part of feedback loop</span><br/>"
+        tip += f"<span style='color:{WONG['orange']}'>⚡ Part of feedback loop</span><br/>"
     tip += "</div>"
     return tip
 
 
-def _edge_tooltip(u, v, data, analysis):
-    effects  = data.get("effects", ["o"])
-    stages   = sorted(set(str(s) for s in data.get("stages", []) if pd.notna(s)))
-    count    = data.get("count", 1)
-    is_fb    = (u, v) in analysis.get("feedback_edges", set())
-    labels   = {"+": "✅ Activating", "-": "❌ Inhibiting", "o": "⚪ No effect"}
-    eff_str  = ", ".join(set(labels.get(e, e) for e in effects))
+def _edge_tooltip(u, v, data, analysis, theme):
+    t             = THEMES[theme]
+    relationships = data.get("relationships", ["no_effect"])
+    perturbations = data.get("perturbations", [])
+    effects       = data.get("effects", ["o"])
+    stages        = sorted(set(str(s) for s in data.get("stages", []) if pd.notna(s)))
+    count         = data.get("count", 1)
+    is_fb         = (u, v) in analysis.get("feedback_edges", set())
+
+    from collections import Counter
+    dom_rel  = Counter(relationships).most_common(1)[0][0] if relationships else "no_effect"
+    rel_labels = {
+        "activating": f"<span style='color:{WONG[\"green\"]}'>▲ Activating</span>",
+        "inhibiting": f"<span style='color:{WONG[\"vermillion\"]}'>▼ Inhibiting</span>",
+        "no_effect":  "<span style='color:#94a3b8'>○ No effect</span>",
+    }
+    rel_str  = rel_labels.get(dom_rel, dom_rel)
     stg_str  = ", ".join(stages[:5]) + ("…" if len(stages) > 5 else "")
 
+    # Show raw data for transparency
+    pert_unique = ", ".join(sorted(set(perturbations)))
+    eff_unique  = ", ".join(sorted(set(effects)))
+
     tip = (
-        f"<div style='font-family:monospace;font-size:13px;padding:8px;min-width:220px'>"
-        f"<b style='color:#00d4ff'>{u}</b>"
+        f"<div style='font-family:monospace;font-size:13px;padding:8px;min-width:240px;"
+        f"background:{t['tooltip_bg']};color:{t['tooltip_text']};border-radius:6px'>"
+        f"<b style='color:{WONG['sky_blue']}'>{u}</b>"
         f"<span style='color:#94a3b8'> → </span>"
-        f"<b style='color:#ff6b35'>{v}</b><br/>"
-        f"<hr style='border-color:#334155;margin:6px 0'/>"
-        f"<b>Effect:</b> {eff_str}<br/>"
+        f"<b style='color:{WONG['orange']}'>{v}</b><br/>"
+        f"<hr style='border-color:{t['tooltip_border']};margin:6px 0'/>"
+        f"<b>True relationship:</b> {rel_str}<br/>"
+        f"<b>Perturbation(s):</b> {pert_unique}<br/>"
+        f"<b>Raw effect(s):</b> {eff_unique}<br/>"
         f"<b>Stage(s):</b> {stg_str}<br/>"
         f"<b>Evidence count:</b> {count}<br/>"
     )
     if is_fb:
-        tip += "<br/><span style='color:#fb923c'>⚡ Feedback loop edge</span><br/>"
+        tip += f"<br/><span style='color:{WONG['orange']}'>⚡ Feedback loop edge</span><br/>"
     tip += "</div>"
     return tip
 
 
-def _legend_html(config):
+def _legend_html(config, theme):
+    t = THEMES[theme]
     return f"""
     <div style='position:fixed;bottom:20px;left:20px;z-index:9999;
-                background:#0f1525;border:1px solid #1e2d4a;border-radius:10px;
-                padding:14px 18px;font-family:monospace;font-size:12px;color:#e2e8f0;
-                box-shadow:0 4px 20px rgba(0,0,0,0.5);min-width:200px'>
-      <div style='font-weight:bold;font-size:13px;color:#00d4ff;margin-bottom:10px'>
+                background:{t['legend_bg']};border:1px solid {t['legend_border']};
+                border-radius:10px;padding:14px 18px;font-family:monospace;
+                font-size:12px;color:{t['legend_text']};
+                box-shadow:0 4px 20px rgba(0,0,0,0.3);min-width:210px'>
+      <div style='font-weight:bold;font-size:13px;color:{WONG["sky_blue"]};margin-bottom:10px'>
         🔬 Lens GRN Legend
       </div>
-      <div style='margin-bottom:6px;font-weight:bold;color:#94a3b8;font-size:10px;text-transform:uppercase'>
+      <div style='margin-bottom:6px;font-weight:bold;color:{t["legend_muted"]};font-size:10px;text-transform:uppercase'>
         Node — Role
       </div>
       <div style='margin-bottom:3px'><span style='color:{config["color_regulator"]}'>●</span> &nbsp;Regulator only</div>
       <div style='margin-bottom:3px'><span style='color:{config["color_target"]}'>●</span> &nbsp;Target only</div>
       <div style='margin-bottom:3px'><span style='color:{config["color_both"]}'>●</span> &nbsp;Regulator &amp; Target</div>
       <div style='margin-bottom:10px'><span style='color:{config["color_selfloop"]}'>●</span> &nbsp;Self-regulatory loop</div>
-      <div style='margin-bottom:6px;font-weight:bold;color:#94a3b8;font-size:10px;text-transform:uppercase'>
-        Edge — Effect
+      <div style='margin-bottom:6px;font-weight:bold;color:{t["legend_muted"]};font-size:10px;text-transform:uppercase'>
+        Edge — True Relationship
       </div>
-      <div style='margin-bottom:3px'><span style='color:{config["color_activating"]}'>━━▶</span> &nbsp;Activating (+)</div>
-      <div style='margin-bottom:3px'><span style='color:{config["color_inhibiting"]}'>━━▶</span> &nbsp;Inhibiting (−)</div>
-      <div style='margin-bottom:3px'><span style='color:{config["color_noeffect"]}'>━━▶</span> &nbsp;No effect (○)</div>
-      <div style='margin-top:10px;font-size:10px;color:#475569'>
-        Node size = connections<br/>Edge width = evidence count
+      <div style='margin-bottom:3px'><span style='color:{config["color_activating"]}'>━━▶</span> &nbsp;Activating</div>
+      <div style='margin-bottom:3px'><span style='color:{config["color_inhibiting"]}'>━━▶</span> &nbsp;Inhibiting</div>
+      <div style='margin-bottom:10px'><span style='color:{config["color_noeffect"]}'>━━▶</span> &nbsp;No effect</div>
+      <div style='font-size:10px;color:{t["legend_muted"]}'>
+        True relationship = Perturbation × Effect<br/>
+        Node size = connections<br/>
+        Edge width = evidence count<br/>
+        Colors: Wong (2011) color-blind safe
       </div>
     </div>"""
 
 
 def visualize(G: nx.DiGraph, analysis: dict, config: dict) -> str:
     print(f"[5/5] Building Pyvis visualization...")
+    theme = config.get("theme", "dark")
+    t     = THEMES[theme]
 
     net = Network(
-        height=config["height"],
-        width=config["width"],
-        bgcolor=config["bgcolor"],
-        font_color=config["font_color"],
+        height=config.get("height", "100vh"),
+        width=config.get("width", "100%"),
+        bgcolor=t["bgcolor"],
+        font_color=t["font_color"],
         directed=True,
         notebook=False,
         cdn_resources="remote",
@@ -395,24 +511,24 @@ def visualize(G: nx.DiGraph, analysis: dict, config: dict) -> str:
             label=node,
             color={
                 "background": color,
-                "border":     "#facc15" if in_fb else color,
-                "highlight":  {"background": "#ffffff", "border": "#ffffff"},
-                "hover":      {"background": "#ffffff", "border": "#ffffff"},
+                "border":     WONG["yellow"] if in_fb else color,
+                "highlight":  {"background": "#ffffff", "border": "#000000"},
+                "hover":      {"background": "#ffffff", "border": "#000000"},
             },
             size=_node_size(G, node, config),
-            title=_node_tooltip(node, G, analysis),
+            title=_node_tooltip(node, G, analysis, theme),
             borderWidth=3 if in_fb else 1,
-            font={"color": "#ffffff", "size": 11, "face": "monospace"},
+            font={"color": t["font_color"], "size": 11, "face": "monospace"},
         )
 
     for u, v, data in G.edges(data=True):
-        effects = data.get("effects", ["o"])
-        count   = data.get("count", 1)
-        is_fb   = (u, v) in analysis.get("feedback_edges", set())
+        rels  = data.get("relationships", ["no_effect"])
+        count = data.get("count", 1)
+        is_fb = (u, v) in analysis.get("feedback_edges", set())
         net.add_edge(
             u, v,
-            color={"color": _edge_color(effects, config), "highlight": "#ffffff", "hover": "#ffffff"},
-            title=_edge_tooltip(u, v, data, analysis),
+            color={"color": _edge_color(rels, config), "highlight": "#ffffff", "hover": "#ffffff"},
+            title=_edge_tooltip(u, v, data, analysis, theme),
             width=1.2 + (count * 0.25),
             arrows={"to": {"enabled": True, "scaleFactor": 0.5}},
             dashes=is_fb,
@@ -430,7 +546,7 @@ def visualize(G: nx.DiGraph, analysis: dict, config: dict) -> str:
         "zoomView": true
       },
       "nodes": {
-        "shadow": {"enabled": true, "color": "rgba(0,0,0,0.4)", "size": 8, "x": 2, "y": 2}
+        "shadow": {"enabled": true, "color": "rgba(0,0,0,0.3)", "size": 8, "x": 2, "y": 2}
       },
       "physics": {
         "stabilization": {"iterations": 250, "updateInterval": 25}
@@ -438,29 +554,30 @@ def visualize(G: nx.DiGraph, analysis: dict, config: dict) -> str:
     }
     """)
 
-    output_path = config["output_file"]
+    output_path = config.get("output_file", "grn_output.html")
     net.save_graph(output_path)
 
-    # Post-process: inject legend + fix white UI controls + style tooltips
+    # Post-process: inject legend + style tooltip + white nav buttons
     with open(output_path, "r", encoding="utf-8") as f:
         html = f.read()
 
-    css = """<style>
-      .vis-navigation .vis-button { filter: invert(1) brightness(2) !important; }
-      div.vis-tooltip {
-        background: #0f1525 !important;
-        border: 1px solid #1e2d4a !important;
-        color: #e2e8f0 !important;
+    nav_filter = "invert(1) brightness(2)" if theme == "dark" else "invert(0) brightness(0)"
+    css = f"""<style>
+      .vis-navigation .vis-button {{ filter: {nav_filter} !important; }}
+      div.vis-tooltip {{
+        background: {t['tooltip_bg']} !important;
+        border: 1px solid {t['tooltip_border']} !important;
+        color: {t['tooltip_text']} !important;
         border-radius: 8px !important;
         font-family: monospace !important;
         padding: 2px !important;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
         max-width: 300px !important;
-      }
+      }}
     </style>"""
 
     html = html.replace("</head>", css + "\n</head>")
-    html = html.replace("</body>", _legend_html(config) + "\n</body>")
+    html = html.replace("</body>", _legend_html(config, theme) + "\n</body>")
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
@@ -534,18 +651,16 @@ if __name__ == "__main__":
 
 
 # =============================================================================
-# QUICK REFERENCE — useful NetworkX one-liners
+# QUICK REFERENCE
 # =============================================================================
 #
 #   df, G, analysis = run_pipeline(CONFIG)
 #
-#   nx.shortest_path(G, 'Pax6', 'Prox1')      # path between two genes
-#   nx.descendants(G, 'Pax6')                  # everything downstream of Pax6
-#   nx.ancestors(G, 'Foxe3')                   # everything upstream of Foxe3
-#   nx.pagerank(G)                             # influence score per gene
-#   list(nx.simple_cycles(G))                  # all feedback loops
-#   nx.in_degree_centrality(G)                 # most regulated genes
-#   nx.out_degree_centrality(G)                # most active regulators
-#   nx.write_graphml(G, 'grn.graphml')         # export → Cytoscape
-#   nx.write_gexf(G, 'grn.gexf')              # export → Gephi
+#   nx.shortest_path(G, 'Pax6', 'Prox1')
+#   nx.descendants(G, 'Pax6')
+#   nx.ancestors(G, 'Foxe3')
+#   nx.pagerank(G)
+#   list(nx.simple_cycles(G))
+#   nx.write_graphml(G, 'grn.graphml')   # → Cytoscape
+#   nx.write_gexf(G, 'grn.gexf')        # → Gephi
 # =============================================================================
