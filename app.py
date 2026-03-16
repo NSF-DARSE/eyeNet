@@ -472,7 +472,7 @@ def update_graph(n_clicks, stage_single, stage_from, stage_to,
     if len(df) == 0:
         t     = THEMES[cfg["theme"]]
         empty = (f"<div style='color:#ef4444;font-family:monospace;padding:40px;"
-                 f"font-size:14px;background:{t[\"bgcolor\"]};height:100%'>"
+                 f"font-size:14px;background:{t["bgcolor"]};height:100%'>"
                  f"No edges match the current filters. Try adjusting your selection.</div>")
         return empty, _stats_panel_empty(cfg["theme"]), ""
 
