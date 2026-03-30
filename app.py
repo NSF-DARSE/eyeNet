@@ -64,7 +64,7 @@ def gene_options(genes):
 
 app = dash.Dash(
     __name__,
-    external_stylesheets=[dbc.themes.CYBORG],
+    external_stylesheets=[dbc.themes.BOOTSTRAP],
     title="Lens GRN Explorer",
     suppress_callback_exceptions=True,
 )
@@ -78,54 +78,70 @@ app.index_string = '''
         {%favicon%}
         {%css%}
         <style>
-            /* Dropdown text colors */
-            .Select-value-label { color: #0f172a !important; }
-            .Select-placeholder { color: #64748b !important; }
-            .Select-input input  { color: #0f172a !important; }
-            .Select-menu-outer   { background: #1e293b !important; }
-            .Select-option       { color: #e2e8f0 !important; }
-            .Select-option.is-focused { background: #334155 !important; }
-            .dash-dropdown .Select-control    { background: #f8fafc !important; }
-            .dash-dropdown .Select-value-label { color: #0f172a !important; }
-
-            /* Theme transition */
-            body, .sidebar-div { transition: background 0.3s, color 0.3s; }
-
-            /* Light mode sidebar override */
-            body.light-mode .sidebar-div {
-                background: #f1f5f9 !important;
-                border-right: 1px solid #e2e8f0 !important;
+            /* General dropdown control */
+            .dash-dropdown .Select-control,
+            .Select-control {
+                background-color: #f8fafc !important;
+                border-color: #cbd5e1 !important;
                 color: #0f172a !important;
             }
-            body.light-mode { background: #f8fafc !important; }
 
-            /* Toggle switch style */
-            .theme-toggle {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                cursor: pointer;
-                font-size: 12px;
-                font-family: monospace;
+            /* Placeholder */
+            .dash-dropdown .Select-placeholder,
+            .Select-placeholder {
+                color: #64748b !important;
             }
-            .toggle-track {
-                width: 36px; height: 18px;
-                border-radius: 9px;
-                background: #334155;
-                position: relative;
-                transition: background 0.2s;
+
+            /* Typed input / searchable text */
+            .dash-dropdown .Select-input input,
+            .Select-input input {
+                color: #0f172a !important;
             }
-            .toggle-track.light { background: #56B4E9; }
-            .toggle-thumb {
-                width: 14px; height: 14px;
-                border-radius: 50%;
-                background: white;
-                position: absolute;
-                top: 2px; left: 2px;
-                transition: left 0.2s;
+
+            /* Selected value */
+            .dash-dropdown .Select-value-label,
+            .dash-dropdown .Select--single > .Select-control .Select-value,
+            .Select-value-label,
+            .Select--single > .Select-control .Select-value {
+                color: #0f172a !important;
             }
-            .toggle-track.light .toggle-thumb { left: 20px; }
-        </style>
+
+            /* Dropdown arrow + clear icon */
+            .dash-dropdown .Select-arrow,
+            .dash-dropdown .Select-clear-zone,
+            .Select-arrow,
+            .Select-clear-zone {
+                color: #334155 !important;
+            }
+
+            /* Menu */
+            .dash-dropdown .Select-menu-outer,
+            .Select-menu-outer {
+                background: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+            }
+
+            /* Options */
+            .dash-dropdown .Select-option,
+            .Select-option {
+                background: #ffffff !important;
+                color: #0f172a !important;
+            }
+
+            .dash-dropdown .Select-option.is-focused,
+            .Select-option.is-focused {
+                background: #e2e8f0 !important;
+                color: #0f172a !important;
+            }
+
+            .dash-dropdown .Select-option.is-selected,
+            .Select-option.is-selected {
+                    background: #cbd5e1 !important;
+                    color: #0f172a !important;
+            }
+
+                body, .sidebar-div { transition: background 0.3s, color 0.3s; }
+    </style>
     </head>
     <body>
         {%app_entry%}
@@ -334,6 +350,7 @@ def build_layout(theme="dark"):
     muted    = "#64748b"
 
     return html.Div(
+        id="app-container",
         style={"display": "flex", "flexDirection": "column", "height": "100vh",
                "background": bg, "color": t["font_color"],
                "fontFamily": "DM Sans, sans-serif", "overflow": "hidden"},
@@ -371,10 +388,10 @@ def build_layout(theme="dark"):
                                         style={"width": "100%", "height": "calc(100vh - 48px)",
                                                "border": "none", "flex": "1",
                                                "background": bg, "display": "block"},
-                                        srcDoc=f"<div style='color:#64748b;font-family:monospace;"
-                                               f"padding:40px;font-size:14px;background:#0a0e1a;height:100%'>"
-                                               f"Click <b style='color:#56B4E9'>&#9654; Apply Filters</b> "
-                                               f"to render the network.</div>",
+                                        srcDoc=f"<div style='color:{muted};font-family:monospace;"
+                                               f"padding:40px;font-size:14px;background:{bg};height:100%'>"
+                                               f"Click <b style='color:{WONG['sky_blue']}'>&#9654; Apply Filters</b> "
+                                               f"to render the network.</div>"
                                     )
                                 ],
                                 style={"height": "calc(100vh - 48px)", "display": "block"},
