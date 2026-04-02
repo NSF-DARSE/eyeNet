@@ -4,7 +4,6 @@ Lens GRN Explorer — Dash App
 =============================================================================
 Run:
     python app.py
-
 Then open:  http://127.0.0.1:8050
 =============================================================================
 """
@@ -24,6 +23,7 @@ from grn_network import (
     THEMES,
     WONG,
     load_data,
+    load_megatable,
     filter_data,
     build_graph,
     analyze_graph,
@@ -31,25 +31,22 @@ from grn_network import (
     stage_numeric,
 )
 
-
 # =============================================================================
 # Load data once at startup
 # =============================================================================
 
 print("\n[APP] Loading GRN data...")
-BASE_DF = load_data(CONFIG)
+BASE_DF     = load_data(CONFIG)
+MEGA_LOOKUP = load_megatable(CONFIG)
 
 ALL_STAGES     = sorted(BASE_DF["stage"].dropna().unique(), key=stage_numeric)
 ALL_REGULATORS = sorted(BASE_DF["regulator"].dropna().unique())
 ALL_TARGETS    = sorted(BASE_DF["target"].dropna().unique())
 
-print(f"[APP] {len(BASE_DF):,} edges | {len(ALL_STAGES)} stages | "
-      f"{len(ALL_REGULATORS)} regulators | {len(ALL_TARGETS)} targets\n")
+print("[APP] Ready — " + str(len(BASE_DF)) + " edges | " +
+      str(len(ALL_STAGES)) + " stages | " +
+      str(len(MEGA_LOOKUP)) + " genes in MegaTable\n")
 
-
-# =============================================================================
-# Helpers
-# =============================================================================
 
 def stage_options(stages):
     return [{"label": s, "value": s} for s in stages]
@@ -59,7 +56,7 @@ def gene_options(genes):
 
 
 # =============================================================================
-# App init
+# App
 # =============================================================================
 
 app = dash.Dash(
@@ -69,8 +66,7 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
 )
 
-app.index_string = '''
-<!DOCTYPE html>
+app.index_string = '''<!DOCTYPE html>
 <html>
     <head>
         {%metas%}
@@ -78,70 +74,43 @@ app.index_string = '''
         {%favicon%}
         {%css%}
         <style>
-            /* General dropdown control */
-            .dash-dropdown .Select-control,
-            .Select-control {
-                background-color: #f8fafc !important;
-                border-color: #cbd5e1 !important;
-                color: #0f172a !important;
-            }
-
-            /* Placeholder */
-            .dash-dropdown .Select-placeholder,
-            .Select-placeholder {
-                color: #64748b !important;
-            }
-
-            /* Typed input / searchable text */
-            .dash-dropdown .Select-input input,
-            .Select-input input {
-                color: #0f172a !important;
-            }
-
-            /* Selected value */
-            .dash-dropdown .Select-value-label,
-            .dash-dropdown .Select--single > .Select-control .Select-value,
-            .Select-value-label,
-            .Select--single > .Select-control .Select-value {
-                color: #0f172a !important;
-            }
-
-            /* Dropdown arrow + clear icon */
-            .dash-dropdown .Select-arrow,
-            .dash-dropdown .Select-clear-zone,
-            .Select-arrow,
-            .Select-clear-zone {
-                color: #334155 !important;
-            }
-
-            /* Menu */
-            .dash-dropdown .Select-menu-outer,
-            .Select-menu-outer {
-                background: #ffffff !important;
+            .Select-control,
+            .dash-dropdown .Select-control {
+                background-color: #ffffff !important;
                 border: 1px solid #cbd5e1 !important;
             }
-
-            /* Options */
-            .dash-dropdown .Select-option,
+            .Select-value,
+            .Select-value-label,
+            .Select--single .Select-value .Select-value-label,
+            .dash-dropdown .Select-value-label {
+                color: #0f172a !important;
+            }
+            .Select-placeholder,
+            .dash-dropdown .Select-placeholder {
+                color: #94a3b8 !important;
+            }
+            .Select-input > input {
+                color: #0f172a !important;
+            }
+            .Select-menu-outer {
+                background-color: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+                z-index: 9999 !important;
+            }
             .Select-option {
-                background: #ffffff !important;
+                background-color: #ffffff !important;
                 color: #0f172a !important;
             }
-
-            .dash-dropdown .Select-option.is-focused,
             .Select-option.is-focused {
-                background: #e2e8f0 !important;
+                background-color: #e2e8f0 !important;
                 color: #0f172a !important;
             }
-
-            .dash-dropdown .Select-option.is-selected,
             .Select-option.is-selected {
-                    background: #cbd5e1 !important;
-                    color: #0f172a !important;
+                background-color: #bfdbfe !important;
+                color: #0f172a !important;
             }
-
-                body, .sidebar-div { transition: background 0.3s, color 0.3s; }
-    </style>
+            body { transition: background 0.3s; }
+        </style>
     </head>
     <body>
         {%app_entry%}
@@ -151,58 +120,54 @@ app.index_string = '''
             {%renderer%}
         </footer>
     </body>
-</html>
-'''
+</html>'''
 
 
 # =============================================================================
-# Layout builder — theme-aware
+# Layout builders
 # =============================================================================
 
 def build_sidebar(theme="dark"):
-    t = THEMES[theme]
-    label_style  = {"color": "#64748b" if theme == "dark" else "#475569",
-                    "fontSize": "10px", "fontWeight": "bold",
-                    "letterSpacing": "0.1em", "fontFamily": "monospace"}
-    sub_style    = {"color": "#94a3b8" if theme == "dark" else "#64748b",
-                    "fontSize": "12px", "marginTop": "8px"}
-    hr_style     = {"borderColor": "#1e2d4a" if theme == "dark" else "#e2e8f0", "margin": "0"}
-    sidebar_bg   = "#0f1525" if theme == "dark" else "#f1f5f9"
-    sidebar_bdr  = "#1e2d4a" if theme == "dark" else "#e2e8f0"
-    text_color   = "#e2e8f0" if theme == "dark" else "#0f172a"
-    muted_color  = "#475569" if theme == "dark" else "#64748b"
+    sidebar_bg = "#0f1525" if theme == "dark" else "#f1f5f9"
+    sidebar_br = "#1e2d4a" if theme == "dark" else "#e2e8f0"
+    text_color = "#e2e8f0" if theme == "dark" else "#0f172a"
+    muted      = "#94a3b8" if theme == "dark" else "#64748b"
+    lbl_color  = "#64748b" if theme == "dark" else "#475569"
+    hr_color   = "#1e2d4a" if theme == "dark" else "#e2e8f0"
+
+    label_style = {"color": lbl_color, "fontSize": "10px", "fontWeight": "bold",
+                   "letterSpacing": "0.1em", "fontFamily": "monospace"}
+    sub_style   = {"color": muted, "fontSize": "12px", "marginTop": "8px"}
+    hr_style    = {"borderColor": hr_color, "margin": "0"}
 
     return html.Div(
-        className="sidebar-div",
         style={
             "width": "300px", "minWidth": "300px",
             "background": sidebar_bg,
-            "borderRight": f"1px solid {sidebar_bdr}",
+            "borderRight": "1px solid " + sidebar_br,
             "padding": "16px", "overflowY": "auto",
             "display": "flex", "flexDirection": "column", "gap": "14px",
         },
         children=[
 
             # Title + theme toggle
-            html.Div(style={"display": "flex", "justifyContent": "space-between", "alignItems": "flex-start"}, children=[
+            html.Div(style={"display": "flex", "justifyContent": "space-between",
+                            "alignItems": "flex-start"}, children=[
                 html.Div([
-                    html.H5("🔬 Lens GRN Explorer",
+                    html.H5("Lens GRN Explorer",
                             style={"color": WONG["sky_blue"], "fontFamily": "monospace",
                                    "marginBottom": "2px", "fontSize": "14px"}),
-                    html.Small("Lachke Lab 2016 — Gene Regulatory Network",
-                               style={"color": muted_color, "fontSize": "11px"}),
+                    html.Small("Lachke Lab 2016 - Gene Regulatory Network",
+                               style={"color": muted, "fontSize": "11px"}),
                 ]),
-                # Theme toggle
-                html.Div(
-                    id="theme-toggle",
+                html.Div(id="theme-toggle", n_clicks=0,
                     style={"cursor": "pointer", "display": "flex", "flexDirection": "column",
-                           "alignItems": "center", "gap": "3px"},
+                           "alignItems": "center", "gap": "3px", "padding": "4px",
+                           "border": "1px solid " + sidebar_br, "borderRadius": "6px"},
                     children=[
-                        html.Div("☀️" if theme == "light" else "🌙",
-                                 style={"fontSize": "16px"}),
+                        html.Div("☀️" if theme == "light" else "🌙", style={"fontSize": "16px"}),
                         html.Div("Light" if theme == "light" else "Dark",
-                                 style={"fontSize": "9px", "color": muted_color,
-                                        "fontFamily": "monospace"}),
+                                 style={"fontSize": "9px", "color": muted, "fontFamily": "monospace"}),
                     ]
                 ),
             ]),
@@ -221,7 +186,8 @@ def build_sidebar(theme="dark"):
                     dcc.Dropdown(id="stage-from", options=stage_options(ALL_STAGES),
                                  placeholder="From", clearable=True,
                                  style={"flex": "1", "fontSize": "12px"}),
-                    html.Span("→", style={"color": muted_color, "padding": "0 6px", "alignSelf": "center"}),
+                    html.Span("to", style={"color": muted, "padding": "0 6px",
+                                           "alignSelf": "center", "fontSize": "11px"}),
                     dcc.Dropdown(id="stage-to", options=stage_options(ALL_STAGES),
                                  placeholder="To", clearable=True,
                                  style={"flex": "1", "fontSize": "12px"}),
@@ -252,17 +218,17 @@ def build_sidebar(theme="dark"):
                     dcc.Checklist(
                         id="relationship-filter",
                         options=[
-                            {"label": f"  ▲ Activating", "value": "activating"},
-                            {"label": f"  ▼ Inhibiting", "value": "inhibiting"},
-                            {"label": f"  ○ No effect",  "value": "no_effect"},
+                            {"label": "  Activating", "value": "activating"},
+                            {"label": "  Inhibiting", "value": "inhibiting"},
+                            {"label": "  No effect",  "value": "no_effect"},
                         ],
                         value=["activating", "inhibiting", "no_effect"],
                         labelStyle={"display": "block", "color": text_color,
                                     "fontSize": "13px", "marginBottom": "4px"},
                     )
                 ]),
-                html.Div("True relationship = Perturbation × Effect",
-                         style={"fontSize": "10px", "color": muted_color, "marginTop": "6px",
+                html.Div("True relationship = Perturbation x Effect",
+                         style={"fontSize": "10px", "color": muted, "marginTop": "6px",
                                 "fontFamily": "monospace"}),
             ]),
 
@@ -280,9 +246,9 @@ def build_sidebar(theme="dark"):
                              value=300, clearable=False, style={"fontSize": "12px"}),
                 html.Label("Layout", style={**sub_style, "marginTop": "10px"}),
                 dcc.Dropdown(id="layout-select",
-                             options=[{"label": "Barnes Hut",   "value": "barnes_hut"},
-                                      {"label": "Force Atlas 2","value": "force_atlas_2based"},
-                                      {"label": "Repulsion",    "value": "repulsion"}],
+                             options=[{"label": "Barnes Hut",    "value": "barnes_hut"},
+                                      {"label": "Force Atlas 2", "value": "force_atlas_2based"},
+                                      {"label": "Repulsion",     "value": "repulsion"}],
                              value="barnes_hut", clearable=False, style={"fontSize": "12px"}),
             ]),
 
@@ -290,18 +256,18 @@ def build_sidebar(theme="dark"):
 
             # Buttons
             html.Div([
-                html.Button("▶  Apply Filters", id="apply-btn", style={
+                html.Button("Apply Filters", id="apply-btn", style={
                     "width": "100%", "padding": "9px",
-                    "background": f"rgba(86,180,233,0.15)",
-                    "border": f"1px solid {WONG['sky_blue']}", "borderRadius": "7px",
+                    "background": "rgba(86,180,233,0.15)",
+                    "border": "1px solid " + WONG["sky_blue"], "borderRadius": "7px",
                     "color": WONG["sky_blue"], "fontFamily": "monospace",
                     "fontSize": "12px", "cursor": "pointer", "marginBottom": "6px",
                 }),
-                html.Button("↺  Reset All", id="reset-btn", style={
+                html.Button("Reset All", id="reset-btn", style={
                     "width": "100%", "padding": "9px",
                     "background": "transparent",
-                    "border": f"1px solid {sidebar_bdr}", "borderRadius": "7px",
-                    "color": muted_color, "fontFamily": "monospace",
+                    "border": "1px solid " + sidebar_br, "borderRadius": "7px",
+                    "color": muted, "fontFamily": "monospace",
                     "fontSize": "12px", "cursor": "pointer",
                 }),
             ]),
@@ -312,12 +278,12 @@ def build_sidebar(theme="dark"):
             html.Div(id="stats-panel", children=[
                 html.Label("NETWORK STATS", style=label_style),
                 html.Div("Apply filters to see stats.",
-                         style={"color": muted_color, "fontSize": "12px", "marginTop": "6px"}),
+                         style={"color": muted, "fontSize": "12px", "marginTop": "6px"}),
             ]),
 
             html.Hr(style=hr_style),
 
-            # Legend
+            # Legend in sidebar
             html.Div([
                 html.Label("LEGEND", style={**label_style, "marginBottom": "8px"}),
                 html.Div([html.Span("●", style={"color": WONG["sky_blue"]}), " Regulator only"],
@@ -328,43 +294,60 @@ def build_sidebar(theme="dark"):
                          style={"fontSize": "12px", "marginBottom": "3px", "color": text_color}),
                 html.Div([html.Span("●", style={"color": WONG["yellow"]}), " Self-regulatory loop"],
                          style={"fontSize": "12px", "marginBottom": "10px", "color": text_color}),
-                html.Div([html.Span("━━▶", style={"color": WONG["green"]}), " Activating"],
+                html.Div([html.Span("▶", style={"color": WONG["green"]}), " Activating"],
                          style={"fontSize": "12px", "marginBottom": "3px", "color": text_color}),
-                html.Div([html.Span("━━▶", style={"color": WONG["vermillion"]}), " Inhibiting"],
+                html.Div([html.Span("▶", style={"color": WONG["vermillion"]}), " Inhibiting"],
                          style={"fontSize": "12px", "marginBottom": "3px", "color": text_color}),
-                html.Div([html.Span("━━▶", style={"color": "#94a3b8"}), " No effect"],
-                         style={"fontSize": "12px", "color": text_color}),
-                html.Div("Wong (2011) color-blind safe palette",
-                         style={"fontSize": "10px", "color": muted_color,
-                                "marginTop": "8px", "fontFamily": "monospace"}),
+                html.Div([html.Span("▶", style={"color": "#94a3b8"}), " No effect"],
+                         style={"fontSize": "12px", "marginBottom": "10px", "color": text_color}),
+                html.Div([
+                    html.Div("Hover edge → PubMed links",
+                             style={"fontSize": "10px", "color": muted, "fontFamily": "monospace"}),
+                    html.Div("Hover node → expression data",
+                             style={"fontSize": "10px", "color": muted, "fontFamily": "monospace"}),
+                    html.Div("Wong (2011) color-blind safe",
+                             style={"fontSize": "10px", "color": muted, "fontFamily": "monospace",
+                                    "marginTop": "4px"}),
+                ]),
             ]),
         ],
     )
 
 
 def build_layout(theme="dark"):
-    t        = THEMES[theme]
-    bg       = t["bgcolor"]
+    t         = THEMES[theme]
+    bg        = t["bgcolor"]
     topbar_bg = "#0f1525" if theme == "dark" else "#ffffff"
-    topbar_bdr = "#1e2d4a" if theme == "dark" else "#e2e8f0"
-    muted    = "#64748b"
+    topbar_br = "#1e2d4a" if theme == "dark" else "#e2e8f0"
+    muted     = "#64748b"
+
+    placeholder = (
+        "<div style='color:#64748b;font-family:monospace;padding:40px;"
+        "font-size:14px;background:" + bg + ";height:100%'>"
+        "Click <b style='color:" + WONG["sky_blue"] + "'>Apply Filters</b> "
+        "to render the network.<br/><br/>"
+        "<span style='font-size:12px;color:#475569'>"
+        "Hover over edges for PubMed references<br/>"
+        "Hover over nodes for expression data (MegaTable)"
+        "</span></div>"
+    )
 
     return html.Div(
         id="app-container",
         style={"display": "flex", "flexDirection": "column", "height": "100vh",
                "background": bg, "color": t["font_color"],
-               "fontFamily": "DM Sans, sans-serif", "overflow": "hidden"},
+               "fontFamily": "sans-serif", "overflow": "hidden"},
         children=[
             # Top bar
             html.Div(
-                style={"background": topbar_bg, "borderBottom": f"1px solid {topbar_bdr}",
+                style={"background": topbar_bg, "borderBottom": "1px solid " + topbar_br,
                        "padding": "10px 20px", "display": "flex",
                        "alignItems": "center", "gap": "12px", "flexShrink": "0"},
                 children=[
-                    html.H4("🔬 Lens GRN Explorer",
+                    html.H4("Lens GRN Explorer",
                             style={"color": WONG["sky_blue"], "fontFamily": "monospace",
                                    "fontSize": "14px", "margin": "0", "fontWeight": "700"}),
-                    html.Span("Gene Regulatory Network — Lachke Lab 2016",
+                    html.Span("Gene Regulatory Network - Lachke Lab 2016",
                               style={"color": muted, "fontSize": "12px"}),
                     html.Div(id="topbar-stats",
                              style={"marginLeft": "auto", "fontFamily": "monospace",
@@ -376,22 +359,21 @@ def build_layout(theme="dark"):
                 style={"display": "flex", "flex": "1", "overflow": "hidden"},
                 children=[
                     build_sidebar(theme),
-                    # Graph panel
                     html.Div(
-                        style={"flex": "1", "display": "flex", "flexDirection": "column", "overflow": "hidden"},
+                        style={"flex": "1", "display": "flex",
+                               "flexDirection": "column", "overflow": "hidden"},
                         children=[
                             dcc.Loading(
-                                id="loading-graph", type="circle", color=WONG["sky_blue"],
+                                id="loading-graph", type="circle",
+                                color=WONG["sky_blue"],
                                 children=[
                                     html.Iframe(
                                         id="graph-frame",
-                                        style={"width": "100%", "height": "calc(100vh - 48px)",
+                                        style={"width": "100%",
+                                               "height": "calc(100vh - 48px)",
                                                "border": "none", "flex": "1",
                                                "background": bg, "display": "block"},
-                                        srcDoc=f"<div style='color:{muted};font-family:monospace;"
-                                               f"padding:40px;font-size:14px;background:{bg};height:100%'>"
-                                               f"Click <b style='color:{WONG['sky_blue']}'>&#9654; Apply Filters</b> "
-                                               f"to render the network.</div>"
+                                        srcDoc=placeholder,
                                     )
                                 ],
                                 style={"height": "calc(100vh - 48px)", "display": "block"},
@@ -400,7 +382,6 @@ def build_layout(theme="dark"):
                     ),
                 ],
             ),
-            # Hidden store for theme
             dcc.Store(id="theme-store", data=theme),
         ],
     )
@@ -413,7 +394,6 @@ app.layout = build_layout("dark")
 # Callbacks
 # =============================================================================
 
-# Toggle theme
 @app.callback(
     Output("theme-store", "data"),
     Input("theme-toggle", "n_clicks"),
@@ -424,7 +404,6 @@ def toggle_theme(n, current_theme):
     return "light" if current_theme == "dark" else "dark"
 
 
-# Re-render layout on theme change
 @app.callback(
     Output("app-container", "children"),
     Input("theme-store", "data"),
@@ -434,16 +413,15 @@ def update_theme_layout(theme):
     return build_layout(theme).children
 
 
-# Reset filters
 @app.callback(
-    Output("stage-from",           "value"),
-    Output("stage-to",             "value"),
-    Output("stage-single",         "value"),
-    Output("filter-regulator",     "value"),
-    Output("filter-target",        "value"),
-    Output("relationship-filter",  "value"),
-    Output("max-edges",            "value"),
-    Output("layout-select",        "value"),
+    Output("stage-from",          "value"),
+    Output("stage-to",            "value"),
+    Output("stage-single",        "value"),
+    Output("filter-regulator",    "value"),
+    Output("filter-target",       "value"),
+    Output("relationship-filter", "value"),
+    Output("max-edges",           "value"),
+    Output("layout-select",       "value"),
     Input("reset-btn", "n_clicks"),
     prevent_initial_call=True,
 )
@@ -451,51 +429,50 @@ def reset_filters(_):
     return None, None, None, None, None, ["activating", "inhibiting", "no_effect"], 300, "barnes_hut"
 
 
-# Main graph update
 @app.callback(
     Output("graph-frame",  "srcDoc"),
     Output("stats-panel",  "children"),
     Output("topbar-stats", "children"),
     Input("apply-btn", "n_clicks"),
-    State("stage-single",          "value"),
-    State("stage-from",            "value"),
-    State("stage-to",              "value"),
-    State("filter-regulator",      "value"),
-    State("filter-target",         "value"),
-    State("relationship-filter",   "value"),
-    State("max-edges",             "value"),
-    State("layout-select",         "value"),
-    State("theme-store",           "data"),
+    State("stage-single",         "value"),
+    State("stage-from",           "value"),
+    State("stage-to",             "value"),
+    State("filter-regulator",     "value"),
+    State("filter-target",        "value"),
+    State("relationship-filter",  "value"),
+    State("max-edges",            "value"),
+    State("layout-select",        "value"),
+    State("theme-store",          "data"),
     prevent_initial_call=True,
 )
 def update_graph(n_clicks, stage_single, stage_from, stage_to,
                  filter_reg, filter_tgt, relationships, max_edges, layout, theme):
 
     cfg = copy.deepcopy(CONFIG)
-    cfg["stage_single"]            = stage_single
-    cfg["stage_from"]              = stage_from
-    cfg["stage_to"]                = stage_to
-    cfg["filter_regulator"]        = filter_reg
-    cfg["filter_target"]           = filter_tgt
-    cfg["relationships_include"]   = relationships or ["activating", "inhibiting", "no_effect"]
-    cfg["max_edges"]               = int(max_edges) if max_edges != 9999 else None
-    cfg["layout"]                  = layout
-    cfg["theme"]                   = theme or "dark"
-    cfg["height"]                  = "100vh"
-    cfg["output_file"]             = os.path.join(tempfile.gettempdir(), "grn_dash_output.html")
+    cfg["stage_single"]          = stage_single
+    cfg["stage_from"]            = stage_from
+    cfg["stage_to"]              = stage_to
+    cfg["filter_regulator"]      = filter_reg
+    cfg["filter_target"]         = filter_tgt
+    cfg["relationships_include"] = relationships or ["activating", "inhibiting", "no_effect"]
+    cfg["max_edges"]             = int(max_edges) if max_edges != 9999 else None
+    cfg["layout"]                = layout
+    cfg["theme"]                 = theme or "dark"
+    cfg["height"]                = "100vh"
+    cfg["output_file"]           = os.path.join(tempfile.gettempdir(), "grn_dash_output.html")
 
     df = filter_data(BASE_DF.copy(), cfg)
 
     if len(df) == 0:
         t     = THEMES[cfg["theme"]]
-        empty = (f"<div style='color:#ef4444;font-family:monospace;padding:40px;"
-                 f"font-size:14px;background:{t["bgcolor"]};height:100%'>"
-                 f"No edges match the current filters. Try adjusting your selection.</div>")
+        empty = ("<div style='color:#ef4444;font-family:monospace;padding:40px;"
+                 "font-size:14px;background:" + t["bgcolor"] + ";height:100%'>"
+                 "No edges match the current filters. Try adjusting your selection.</div>")
         return empty, _stats_panel_empty(cfg["theme"]), ""
 
     G        = build_graph(df)
     analysis = analyze_graph(G, cfg)
-    out_path = visualize(G, analysis, cfg)
+    out_path = visualize(G, analysis, cfg, MEGA_LOOKUP)
 
     with open(out_path, "r", encoding="utf-8") as f:
         html_content = f.read()
@@ -504,42 +481,44 @@ def update_graph(n_clicks, stage_single, stage_from, stage_to,
 
 
 def _stats_panel(G, analysis, theme="dark"):
-    t     = THEMES[theme]
+    t         = THEMES[theme]
+    lbl_color = "#64748b" if theme == "dark" else "#475569"
+    muted     = "#94a3b8" if theme == "dark" else "#64748b"
     regs  = sum(1 for n in G.nodes() if G.nodes[n].get("is_reg") and not G.nodes[n].get("is_tgt"))
     tgts  = sum(1 for n in G.nodes() if G.nodes[n].get("is_tgt") and not G.nodes[n].get("is_reg"))
     both  = sum(1 for n in G.nodes() if G.nodes[n].get("is_reg") and G.nodes[n].get("is_tgt"))
     loops = len(analysis.get("feedback_loops", []))
     sl    = len(analysis.get("self_loops", []))
     hubs  = analysis.get("hub_genes", [])
-    label_style = {"color": "#64748b" if theme == "dark" else "#475569",
-                   "fontSize": "10px", "fontWeight": "bold",
+    label_style = {"color": lbl_color, "fontSize": "10px", "fontWeight": "bold",
                    "letterSpacing": "0.1em", "fontFamily": "monospace"}
 
-    def row(label, value, color=None):
-        color = color or WONG["sky_blue"]
+    def row(label, value, color):
         return html.Div(
             style={"display": "flex", "justifyContent": "space-between",
                    "marginBottom": "4px", "fontSize": "12px"},
             children=[
-                html.Span(label, style={"color": "#94a3b8" if theme == "dark" else "#64748b"}),
+                html.Span(label, style={"color": muted}),
                 html.Span(str(value), style={"color": color, "fontFamily": "monospace"}),
             ]
         )
 
     hub_items = [
-        html.Div(style={"display": "flex", "justifyContent": "space-between",
-                        "marginBottom": "2px", "fontSize": "11px"},
-                 children=[
-                     html.Span(gene, style={"color": t["tooltip_text"], "fontFamily": "monospace"}),
-                     html.Span(str(deg), style={"color": WONG["sky_blue"], "fontFamily": "monospace"}),
-                 ])
+        html.Div(
+            style={"display": "flex", "justifyContent": "space-between",
+                   "marginBottom": "2px", "fontSize": "11px"},
+            children=[
+                html.Span(gene, style={"color": t["tooltip_text"], "fontFamily": "monospace"}),
+                html.Span(str(deg), style={"color": WONG["sky_blue"], "fontFamily": "monospace"}),
+            ]
+        )
         for gene, deg in hubs[:6]
     ]
 
     return html.Div([
         html.Label("NETWORK STATS", style={**label_style, "marginBottom": "8px", "display": "block"}),
-        row("Nodes",          G.number_of_nodes()),
-        row("Edges",          G.number_of_edges()),
+        row("Nodes",          G.number_of_nodes(), WONG["sky_blue"]),
+        row("Edges",          G.number_of_edges(), WONG["sky_blue"]),
         row("Regulators",     regs,  WONG["sky_blue"]),
         row("Targets",        tgts,  WONG["orange"]),
         row("Both",           both,  WONG["pink"]),
@@ -553,18 +532,20 @@ def _stats_panel(G, analysis, theme="dark"):
 
 
 def _stats_panel_empty(theme="dark"):
-    label_style = {"color": "#64748b", "fontSize": "10px", "fontWeight": "bold",
-                   "letterSpacing": "0.1em", "fontFamily": "monospace"}
+    lbl_color = "#64748b" if theme == "dark" else "#475569"
     return html.Div([
-        html.Label("NETWORK STATS", style=label_style),
+        html.Label("NETWORK STATS",
+                   style={"color": lbl_color, "fontSize": "10px", "fontWeight": "bold",
+                          "letterSpacing": "0.1em", "fontFamily": "monospace"}),
         html.Div("No edges match filters.",
                  style={"color": WONG["vermillion"], "fontSize": "12px", "marginTop": "6px"}),
     ])
 
 
 def _topbar_stats(G, analysis):
-    return (f"Nodes: {G.number_of_nodes()}  |  Edges: {G.number_of_edges()}  |  "
-            f"Feedback loops: {len(analysis.get('feedback_loops', []))}")
+    return ("Nodes: " + str(G.number_of_nodes()) +
+            "  |  Edges: " + str(G.number_of_edges()) +
+            "  |  Feedback loops: " + str(len(analysis.get("feedback_loops", []))))
 
 
 # =============================================================================
