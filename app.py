@@ -62,7 +62,6 @@ app.index_string = '''<!DOCTYPE html>
     <style>
         /* ===== DROPDOWN FIX ===== */
 
-        /* Main control box */
         .Select-control {
             background: #ffffff !important;
             border: 1px solid #cbd5e1 !important;
@@ -70,7 +69,6 @@ app.index_string = '''<!DOCTYPE html>
             box-shadow: none !important;
         }
 
-        /* When dropdown is focused/open */
         .is-focused:not(.is-open) > .Select-control,
         .is-open > .Select-control {
             background: #ffffff !important;
@@ -78,25 +76,33 @@ app.index_string = '''<!DOCTYPE html>
             box-shadow: none !important;
         }
 
-        /* Selected single value */
+        /* single selected text */
         .Select--single > .Select-control .Select-value,
         .Select--single > .Select-control .Select-value .Select-value-label,
-        .Select-value,
         .Select-value-label {
             color: #0f172a !important;
         }
 
-        /* Multi-value text */
+        /* multi selected chip */
+        .Select--multi .Select-value {
+            background: #ede9fe !important;
+            border: 1px solid #c4b5fd !important;
+            color: #0f172a !important;
+        }
+
         .Select--multi .Select-value-label {
             color: #0f172a !important;
         }
 
-        /* Placeholder */
+        .Select--multi .Select-value-icon {
+            border-right: 1px solid #c4b5fd !important;
+            color: #475569 !important;
+        }
+
         .Select-placeholder {
             color: #64748b !important;
         }
 
-        /* Search input text */
         .Select-input,
         .Select-input input,
         .Select-input > input,
@@ -105,7 +111,6 @@ app.index_string = '''<!DOCTYPE html>
             background: transparent !important;
         }
 
-        /* Arrow / clear icons */
         .Select-arrow,
         .Select-arrow-zone,
         .Select-clear,
@@ -113,7 +118,6 @@ app.index_string = '''<!DOCTYPE html>
             color: #64748b !important;
         }
 
-        /* Dropdown menu */
         .Select-menu-outer {
             background: #ffffff !important;
             border: 1px solid #cbd5e1 !important;
@@ -121,7 +125,6 @@ app.index_string = '''<!DOCTYPE html>
             z-index: 9999 !important;
         }
 
-        /* Options */
         .Select-option {
             background: #ffffff !important;
             color: #0f172a !important;
@@ -137,7 +140,6 @@ app.index_string = '''<!DOCTYPE html>
             color: #0f172a !important;
         }
 
-        /* Virtualized options used by Dash */
         .VirtualizedSelectOption {
             background: #ffffff !important;
             color: #0f172a !important;
@@ -148,13 +150,6 @@ app.index_string = '''<!DOCTYPE html>
             color: #0f172a !important;
         }
 
-        /* Disabled look if any dropdown becomes disabled */
-        .Select.is-disabled > .Select-control {
-            background: #f8fafc !important;
-            opacity: 1 !important;
-        }
-
-        /* Scrollbar */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
     </style>
