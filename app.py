@@ -60,29 +60,103 @@ app.index_string = '''<!DOCTYPE html>
     {%favicon%}
     {%css%}
     <style>
-        /* ===== DROPDOWN FIX — selected value always dark text ===== */
-        .Select-control { background:#fff !important; border:1px solid #cbd5e1 !important; }
-        .Select-value    { color:#0f172a !important; }
-        .Select-value-label { color:#0f172a !important; }
-        .Select--single .Select-value { color:#0f172a !important; }
-        .Select--single .Select-value .Select-value-label { color:#0f172a !important; }
-        .Select--multi  .Select-value-label { color:#0f172a !important; }
-        .Select-placeholder { color:#94a3b8 !important; }
-        .Select-input > input { color:#0f172a !important; background:transparent !important; }
-        .Select-input { color:#0f172a !important; }
-        .Select-menu-outer { background:#fff !important; border:1px solid #cbd5e1 !important; z-index:9999 !important; }
-        .Select-option { color:#0f172a !important; background:#fff !important; }
-        .Select-option.is-focused  { background:#e2e8f0 !important; color:#0f172a !important; }
-        .Select-option.is-selected { background:#bfdbfe !important; color:#0f172a !important; }
-        .Select-arrow-zone { color:#64748b !important; }
-        /* Dash 2.x uses VirtualizedSelect */
-        .VirtualizedSelectOption { color:#0f172a !important; background:#fff !important; }
-        .VirtualizedSelectFocusedOption { background:#e2e8f0 !important; }
-        /* Force text color inside any input inside a dropdown */
-        .dash-dropdown input { color:#0f172a !important; }
+        /* ===== DROPDOWN FIX ===== */
+
+        /* Main control box */
+        .Select-control {
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #0f172a !important;
+            box-shadow: none !important;
+        }
+
+        /* When dropdown is focused/open */
+        .is-focused:not(.is-open) > .Select-control,
+        .is-open > .Select-control {
+            background: #ffffff !important;
+            border: 1px solid #8b5cf6 !important;
+            box-shadow: none !important;
+        }
+
+        /* Selected single value */
+        .Select--single > .Select-control .Select-value,
+        .Select--single > .Select-control .Select-value .Select-value-label,
+        .Select-value,
+        .Select-value-label {
+            color: #0f172a !important;
+        }
+
+        /* Multi-value text */
+        .Select--multi .Select-value-label {
+            color: #0f172a !important;
+        }
+
+        /* Placeholder */
+        .Select-placeholder {
+            color: #64748b !important;
+        }
+
+        /* Search input text */
+        .Select-input,
+        .Select-input input,
+        .Select-input > input,
+        .dash-dropdown input {
+            color: #0f172a !important;
+            background: transparent !important;
+        }
+
+        /* Arrow / clear icons */
+        .Select-arrow,
+        .Select-arrow-zone,
+        .Select-clear,
+        .Select-clear-zone {
+            color: #64748b !important;
+        }
+
+        /* Dropdown menu */
+        .Select-menu-outer {
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #0f172a !important;
+            z-index: 9999 !important;
+        }
+
+        /* Options */
+        .Select-option {
+            background: #ffffff !important;
+            color: #0f172a !important;
+        }
+
+        .Select-option.is-focused {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+
+        .Select-option.is-selected {
+            background: #e9d5ff !important;
+            color: #0f172a !important;
+        }
+
+        /* Virtualized options used by Dash */
+        .VirtualizedSelectOption {
+            background: #ffffff !important;
+            color: #0f172a !important;
+        }
+
+        .VirtualizedSelectFocusedOption {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+
+        /* Disabled look if any dropdown becomes disabled */
+        .Select.is-disabled > .Select-control {
+            background: #f8fafc !important;
+            opacity: 1 !important;
+        }
+
         /* Scrollbar */
-        ::-webkit-scrollbar { width:4px; }
-        ::-webkit-scrollbar-thumb { background:#334155; border-radius:2px; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
     </style>
 </head>
 <body>
