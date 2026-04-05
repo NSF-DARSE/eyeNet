@@ -2,29 +2,23 @@
 =============================================================================
 Lens GRN Explorer — NetworkX + Pyvis
 =============================================================================
-Lachke Lab 2016 — Gene Regulatory Network
-
 KEY FIXES:
-    - vis.js tooltips: titles converted to DOM elements so HTML renders correctly
-    - PubMed links now clickable in edge tooltips
-    - Expression data in node tooltips
-    - Legend as collapsible button (bottom-left)
-    - Compact zoom box (bottom-right)
+  - Custom sticky tooltip panel (stays visible so links are clickable)
+  - PubMed links open in new tab reliably
+  - Legend as collapsible button
+  - Compact zoom box
+  - MegaTable data tagged on nodes (ring border = has expression data)
 =============================================================================
 """
 
-import os
-import sys
-import re
-import json
-import webbrowser
+import os, sys, webbrowser
 import pandas as pd
 import networkx as nx
 from pyvis.network import Network
 from collections import Counter
 
 # =============================================================================
-# 1. CONFIG
+# WONG palette + CONFIG
 # =============================================================================
 
 WONG = {
@@ -40,7 +34,7 @@ WONG = {
 
 CONFIG = {
     "input_file":     "data/Lens_GRN_June_2016_original FOR HACKATHON - Salil Lachke.xlsx",
-    "megatable_file": "data/MegaTable_April_24_2024_for_Microarray_and_RNA_Seq_Sent_to_Murali__1_.xls",
+    "megatable_file": "data/MegaTable April 24 2024 for Microarray and RNA Seq Sent to Murali (1).xls",
     "output_file":    "grn_output.html",
     "sheet_name":     "Lens_GRN_pert",
     "stage_from":     None,
@@ -82,12 +76,26 @@ THEMES = {
 }
 
 # =============================================================================
-# 2. DATA LOADING
+# DATA LOADING
 # =============================================================================
 
+def _find_megatable(config):
+    """Try multiple possible filenames for the MegaTable."""
+    candidates = [
+        config.get("megatable_file", ""),
+        "data/MegaTable April 24 2024 for Microarray and RNA Seq Sent to Murali (1).xls",
+        "data/MegaTable_April_24_2024_for_Microarray_and_RNA_Seq_Sent_to_Murali__1_.xls",
+        "data/MegaTable.xls",
+    ]
+    for path in candidates:
+        if path and os.path.exists(path):
+            return path
+    return None
+
+
 def load_megatable(config):
-    path = config.get("megatable_file", "")
-    if not path or not os.path.exists(path):
+    path = _find_megatable(config)
+    if not path:
         print("[WARN] MegaTable not found — expression data unavailable")
         return {}
     print("      Loading MegaTable: " + path)
@@ -100,16 +108,17 @@ def load_megatable(config):
               'enr_LEC_P0_Rob','enr_FC_P0_Rob','enr_FC_3Mo','enr_LEC_3Mo',
               'enr_FC_6Mo','enr_LEC_6Mo','enr_FC_2Y','enr_LEC_2Y']
 
+    def sf(v):
+        try:
+            if pd.notna(v): return round(float(v), 3)
+        except: pass
+        return None
+
     lookup = {}
     for _, row in df.iterrows():
         sym = str(row.get('Symbol', '')).strip()
         if not sym or sym == 'nan':
             continue
-        def sf(v):
-            try:
-                if pd.notna(v): return round(float(v), 3)
-            except: pass
-            return None
         lookup[sym] = {
             'entrez':      str(row.get('Entrez', '')),
             'uniprot':     str(row.get('UNIPROT', '')),
@@ -118,7 +127,7 @@ def load_megatable(config):
             'microarray_enr': {c: sf(row.get(c)) for c in ma_enr},
             'rnaseq':         {c: sf(row.get(c)) for c in rna},
         }
-    print("      MegaTable: " + str(len(lookup)) + " genes")
+    print("      MegaTable: " + str(len(lookup)) + " genes loaded")
     return lookup
 
 
@@ -131,15 +140,10 @@ def load_data(config):
     df = pd.read_excel(path, sheet_name=config["sheet_name"])
     df.columns = [str(c).strip() for c in df.columns]
     col_map = {
-        df.columns[0]:  "sno",
-        df.columns[1]:  "regulator",
-        df.columns[2]:  "target",
-        df.columns[4]:  "perturbation",
-        df.columns[5]:  "effect",
-        df.columns[6]:  "stage",
-        df.columns[7]:  "context",
-        df.columns[20]: "reference",
-        df.columns[21]: "pmid",
+        df.columns[0]: "sno", df.columns[1]: "regulator", df.columns[2]: "target",
+        df.columns[4]: "perturbation", df.columns[5]: "effect",
+        df.columns[6]: "stage", df.columns[7]: "context",
+        df.columns[20]: "reference", df.columns[21]: "pmid",
     }
     df = df.rename(columns=col_map)
     df = df[["sno","regulator","target","perturbation","effect","stage","context","reference","pmid"]]
@@ -167,7 +171,7 @@ def _compute_relationship(row):
 
 
 # =============================================================================
-# 3. FILTERING
+# FILTERING
 # =============================================================================
 
 def stage_numeric(stage):
@@ -202,7 +206,7 @@ def filter_data(df, config):
 
 
 # =============================================================================
-# 4. GRAPH BUILDING
+# GRAPH BUILDING
 # =============================================================================
 
 def build_graph(df):
@@ -237,7 +241,7 @@ def build_graph(df):
 
 
 # =============================================================================
-# 5. ANALYSIS
+# ANALYSIS
 # =============================================================================
 
 def analyze_graph(G, config):
@@ -271,7 +275,7 @@ def analyze_graph(G, config):
 
 
 # =============================================================================
-# 6. VISUALIZATION HELPERS
+# VISUALIZATION HELPERS
 # =============================================================================
 
 def _node_size(G, node, config):
@@ -297,273 +301,259 @@ def _edge_color(relationships, config):
     return config["color_noeffect"]
 
 
-def _escape_js_string(s):
-    """Escape a string for safe embedding inside a JS string literal."""
-    return (s.replace("\\", "\\\\")
-             .replace("'", "\\'")
-             .replace("\n", " ")
-             .replace("\r", ""))
-
-
-def _node_tooltip_html(node, G, analysis, theme, mega_lookup):
-    """Returns raw HTML string for node tooltip."""
-    t       = THEMES[theme]
-    bg      = t["tooltip_bg"]
-    txt     = t["tooltip_text"]
-    bdr     = t["tooltip_border"]
-    mut     = "#64748b"
-    d       = G.nodes[node]
-    is_reg  = d.get("is_reg", False)
-    is_tgt  = d.get("is_tgt", False)
-    out_deg = d.get("out_degree", 0)
-    in_deg  = d.get("in_degree", 0)
-    cent    = d.get("deg_centrality", 0)
-
-    if is_reg and is_tgt: role = "Regulator &amp; Target"
-    elif is_reg:          role = "Regulator"
-    else:                 role = "Target"
-
-    self_loop   = node in set(e[0] for e in analysis.get("self_loops", []))
-    in_feedback = node in analysis.get("feedback_nodes", set())
-
-    entrez = ""
-    if node in mega_lookup:
-        entrez = mega_lookup[node].get("entrez", "")
-
-    h = (
-        "<div style='font-family:monospace;font-size:12px;padding:10px;"
-        "min-width:220px;max-width:300px;background:" + bg + ";color:" + txt + ";border-radius:8px'>"
-        "<b style='font-size:14px;color:" + WONG["sky_blue"] + "'>" + node + "</b>"
-    )
-    if entrez and entrez != "nan":
-        h += (" <a href='https://www.ncbi.nlm.nih.gov/gene/" + entrez +
-              "' target='_blank' style='color:" + WONG["sky_blue"] +
-              ";font-size:10px'>[NCBI]</a>")
-    h += (
-        "<hr style='border-color:" + bdr + ";margin:5px 0'/>"
-        "<b>Role:</b> " + role + "<br/>"
-        "<b>Out (regulates):</b> " + str(out_deg) + "<br/>"
-        "<b>In (regulated by):</b> " + str(in_deg) + "<br/>"
-        "<b>Centrality:</b> " + str(round(cent,3)) + "<br/>"
-    )
-    if self_loop:
-        h += "<span style='color:" + WONG["yellow"] + "'>&#128260; Self-regulatory</span><br/>"
-    if in_feedback:
-        h += "<span style='color:" + WONG["orange"] + "'>&#9889; Feedback loop</span><br/>"
-    h += "</div>"
-    return h
-
-
-def _edge_tooltip_html(u, v, data, analysis, theme):
-    """Returns raw HTML string for edge tooltip."""
-    t             = THEMES[theme]
-    bg            = t["tooltip_bg"]
-    txt           = t["tooltip_text"]
-    bdr           = t["tooltip_border"]
-    relationships = data.get("relationships", ["no_effect"])
-    perturbations = data.get("perturbations", [])
-    effects       = data.get("effects", ["o"])
-    stages        = sorted(set(str(s) for s in data.get("stages",[]) if pd.notna(s)))
-    count         = data.get("count", 1)
-    pmids         = data.get("pmids", [])
-    is_fb         = (u, v) in analysis.get("feedback_edges", set())
-
-    dom_rel = Counter(relationships).most_common(1)[0][0] if relationships else "no_effect"
-    if dom_rel == "activating":
-        rel_str = "<span style='color:" + WONG["green"] + "'>&#9650; Activating</span>"
-    elif dom_rel == "inhibiting":
-        rel_str = "<span style='color:" + WONG["vermillion"] + "'>&#9660; Inhibiting</span>"
-    else:
-        rel_str = "<span style='color:#94a3b8'>&#9675; No effect</span>"
-
-    stg_str = ", ".join(stages[:5]) + ("..." if len(stages)>5 else "")
-
-    h = (
-        "<div style='font-family:monospace;font-size:12px;padding:10px;"
-        "min-width:260px;max-width:340px;background:" + bg + ";color:" + txt + ";border-radius:8px'>"
-        "<b style='color:" + WONG["sky_blue"] + "'>" + u + "</b>"
-        " <span style='color:#94a3b8'>&#8594;</span> "
-        "<b style='color:" + WONG["orange"] + "'>" + v + "</b>"
-        "<hr style='border-color:" + bdr + ";margin:5px 0'/>"
-        "<b>Relationship:</b> " + rel_str + "<br/>"
-        "<b>Perturbation:</b> " + ", ".join(sorted(set(perturbations))) + "<br/>"
-        "<b>Raw effect:</b> " + ", ".join(sorted(set(effects))) + "<br/>"
-        "<b>Stage(s):</b> " + stg_str + "<br/>"
-        "<b>Evidence:</b> " + str(count) + " record(s)<br/>"
-    )
-    if pmids:
-        h += "<hr style='border-color:" + bdr + ";margin:5px 0'/>"
-        h += "<b>PubMed:</b><br/>"
-        for pmid in pmids[:6]:
-            h += ("<a href='https://pubmed.ncbi.nlm.nih.gov/" + pmid +
-                  "/' target='_blank' style='color:" + WONG["sky_blue"] +
-                  ";display:block;margin:2px 0'>&#128196; PMID " + pmid + "</a>")
-        if len(pmids) > 6:
-            h += "<span style='color:#64748b'>+" + str(len(pmids)-6) + " more</span><br/>"
-    if is_fb:
-        h += "<span style='color:" + WONG["orange"] + "'>&#9889; Feedback loop edge</span><br/>"
-    h += "</div>"
-    return h
-
-
-def _post_process_html(html_str, config, theme, mega_lookup):
+def _build_node_data_js(G, analysis, config, mega_lookup):
     """
-    Post-process the pyvis-generated HTML to:
-    1. Convert all node/edge title strings to DOM elements
-       so vis.js renders HTML (links, colors, etc.) correctly.
-    2. Inject legend button, zoom controls, CSS.
+    Build a JS object mapping node_id -> tooltip HTML and edge data.
+    This is embedded in the page so our custom tooltip can access it.
     """
-    t   = THEMES[theme]
-    bg  = t["tooltip_bg"]
-    bdr = t["tooltip_border"]
-    txt = t["tooltip_text"]
+    import json
 
-    # ── CSS ──────────────────────────────────────────────────────────────
-    css = (
-        "<style>"
-        "div.vis-tooltip {"
-        "  background:" + bg + " !important;"
-        "  border:1px solid " + bdr + " !important;"
-        "  color:" + txt + " !important;"
-        "  border-radius:8px !important;"
-        "  padding:0 !important;"
-        "  box-shadow:0 4px 20px rgba(0,0,0,0.4) !important;"
-        "  max-width:360px !important;"
-        "  font-family:monospace !important;"
-        "}"
-        "a { cursor: pointer !important; }"
-        "</style>"
-    )
-    html_str = html_str.replace("</head>", css + "\n</head>")
+    node_data = {}
+    for node in G.nodes():
+        d       = G.nodes[node]
+        is_reg  = d.get("is_reg", False)
+        is_tgt  = d.get("is_tgt", False)
+        out_deg = d.get("out_degree", 0)
+        in_deg  = d.get("in_degree", 0)
+        cent    = d.get("deg_centrality", 0)
+        self_loop   = node in set(e[0] for e in analysis.get("self_loops", []))
+        in_feedback = node in analysis.get("feedback_nodes", set())
 
-    # ── Store network reference for zoom ─────────────────────────────────
-    html_str = html_str.replace(
-        "var network = new vis.Network(",
-        "window.network = new vis.Network("
-    )
+        if is_reg and is_tgt: role = "Regulator & Target"
+        elif is_reg:          role = "Regulator"
+        else:                 role = "Target"
 
-    # ── JS patch: convert title strings -> DOM elements ──────────────────
-    # vis.js renders HTML only if title is a DOM Node, not a string.
-    # We inject a patch that runs after network init and replaces all
-    # string titles with div elements containing the HTML.
-    patch_js = """
+        mega = mega_lookup.get(node, {})
+        entrez  = mega.get("entrez", "")
+        uniprot = mega.get("uniprot", "")
+        desc    = mega.get("description", "")
+        has_expr = bool(mega)
+
+        node_data[node] = {
+            "role": role,
+            "out": out_deg,
+            "in": in_deg,
+            "cent": round(cent, 3),
+            "self_loop": self_loop,
+            "feedback": in_feedback,
+            "entrez": entrez if entrez and entrez != "nan" else "",
+            "uniprot": uniprot if uniprot and uniprot != "nan" else "",
+            "desc": desc[:80] if desc and desc != "nan" else "",
+            "has_expr": has_expr,
+        }
+
+    edge_data = {}
+    for u, v, data in G.edges(data=True):
+        rels  = data.get("relationships", ["no_effect"])
+        perts = data.get("perturbations", [])
+        effs  = data.get("effects", ["o"])
+        stages= sorted(set(str(s) for s in data.get("stages",[]) if pd.notna(s)))
+        count = data.get("count", 1)
+        pmids = data.get("pmids", [])
+        is_fb = (u, v) in analysis.get("feedback_edges", set())
+        dom_rel = Counter(rels).most_common(1)[0][0] if rels else "no_effect"
+
+        key = u + "|||" + v
+        edge_data[key] = {
+            "from": u,
+            "to": v,
+            "rel": dom_rel,
+            "perts": sorted(set(perts)),
+            "effs": sorted(set(effs)),
+            "stages": stages[:5],
+            "count": count,
+            "pmids": pmids[:8],
+            "feedback": is_fb,
+        }
+
+    return json.dumps(node_data), json.dumps(edge_data)
+
+
+def _build_custom_tooltip_js(config, theme):
+    """
+    Build JS that creates a custom sticky tooltip panel.
+    This replaces vis.js native tooltips with a custom div that
+    stays visible when you hover over it, so links are clickable.
+    """
+    t           = THEMES[theme]
+    bg          = t["tooltip_bg"]
+    bdr         = t["tooltip_border"]
+    txt         = t["tooltip_text"]
+    sky         = WONG["sky_blue"]
+    orange      = WONG["orange"]
+    green       = WONG["green"]
+    verm        = WONG["vermillion"]
+    yellow      = WONG["yellow"]
+    muted       = "#64748b"
+
+    return """
+<div id="custom-tooltip" style="
+    position:fixed; z-index:99999; display:none;
+    background:""" + bg + """; border:1px solid """ + bdr + """;
+    color:""" + txt + """; border-radius:10px;
+    padding:12px 14px; font-family:monospace; font-size:12px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:340px;
+    min-width:240px; pointer-events:auto;
+    transition: opacity 0.1s;
+" id="custom-tooltip"></div>
+
 <script>
-(function patchTitles() {
-  function applyTitles() {
-    if (!window.network) { setTimeout(applyTitles, 300); return; }
-    var nodesDS = window.network.body.data.nodes;
-    var edgesDS = window.network.body.data.edges;
+var GRN_NODE_DATA = """ + "NODE_DATA_PLACEHOLDER" + """;
+var GRN_EDGE_DATA = """ + "EDGE_DATA_PLACEHOLDER" + """;
 
-    function makeDiv(html) {
-      var d = document.createElement('div');
-      d.innerHTML = html;
-      // Make links work inside vis.js tooltip
-      d.querySelectorAll('a').forEach(function(a) {
-        a.addEventListener('click', function(e) {
-          e.stopPropagation();
-          window.open(a.href, '_blank');
-        });
-      });
-      return d;
+var tooltip = document.getElementById('custom-tooltip');
+var tooltipHideTimer = null;
+var tooltipVisible = false;
+
+function showTooltip(html, x, y) {
+    clearTimeout(tooltipHideTimer);
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+    tooltipVisible = true;
+
+    // Position tooltip
+    var tw = 350, th = 300;
+    var wx = window.innerWidth, wy = window.innerHeight;
+    var left = x + 15;
+    var top  = y + 15;
+    if (left + tw > wx) left = x - tw - 10;
+    if (top  + th > wy) top  = y - th - 10;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+}
+
+function hideTooltipDelayed() {
+    tooltipHideTimer = setTimeout(function() {
+        tooltip.style.display = 'none';
+        tooltipVisible = false;
+    }, 300);
+}
+
+// Keep tooltip visible when hovering over it
+tooltip.addEventListener('mouseenter', function() {
+    clearTimeout(tooltipHideTimer);
+});
+tooltip.addEventListener('mouseleave', function() {
+    hideTooltipDelayed();
+});
+
+function buildNodeTooltip(nodeId) {
+    var d = GRN_NODE_DATA[nodeId];
+    if (!d) return '<b>' + nodeId + '</b>';
+
+    var roleColor = d.role === 'Regulator' ? '""" + sky + """' :
+                    d.role === 'Target'     ? '""" + orange + """' : '""" + WONG["pink"] + """';
+
+    var html = '<div style="margin-bottom:6px">'
+             + '<b style="font-size:14px;color:""" + sky + """">' + nodeId + '</b>';
+
+    if (d.entrez) {
+        html += ' <a href="https://www.ncbi.nlm.nih.gov/gene/' + d.entrez
+              + '" target="_blank" style="color:""" + sky + """;font-size:10px;text-decoration:underline">[NCBI]</a>';
+    }
+    if (d.uniprot) {
+        html += ' <a href="https://www.uniprot.org/uniprot/' + d.uniprot
+              + '" target="_blank" style="color:""" + sky + """;font-size:10px;text-decoration:underline">[UniProt]</a>';
+    }
+    html += '</div>';
+    html += '<hr style="border-color:""" + bdr + """;margin:4px 0"/>';
+    html += '<b>Role:</b> <span style="color:'+roleColor+'">' + d.role + '</span><br/>';
+    html += '<b>Regulates:</b> ' + d.out + ' genes &nbsp; <b>Regulated by:</b> ' + d.in + '<br/>';
+    html += '<b>Centrality:</b> ' + d.cent + '<br/>';
+
+    if (d.self_loop) html += '<span style="color:""" + yellow + """">&#128260; Self-regulatory loop</span><br/>';
+    if (d.feedback)  html += '<span style="color:""" + orange + """">&#9889; Part of feedback loop</span><br/>';
+
+    if (d.desc) {
+        html += '<div style="color:""" + muted + """;font-size:10px;font-style:italic;margin-top:4px">' + d.desc + '</div>';
     }
 
-    nodesDS.get().forEach(function(node) {
-      if (typeof node.title === 'string' && node.title.indexOf('<') !== -1) {
-        nodesDS.update({id: node.id, title: makeDiv(node.title)});
-      }
+    if (d.has_expr) {
+        html += '<div style="margin-top:6px;padding:4px 6px;background:rgba(86,180,233,0.1);'
+             +  'border-radius:4px;font-size:10px;color:""" + sky + """">'
+             +  '&#128202; Expression data available — see sidebar panel</div>';
+    }
+
+    return html;
+}
+
+function buildEdgeTooltip(fromId, toId) {
+    var key = fromId + '|||' + toId;
+    var d = GRN_EDGE_DATA[key];
+    if (!d) return '<b>' + fromId + ' → ' + toId + '</b>';
+
+    var relColor = d.rel === 'activating' ? '""" + green + """' :
+                   d.rel === 'inhibiting' ? '""" + verm + """' : '""" + muted + """';
+    var relIcon  = d.rel === 'activating' ? '▲' :
+                   d.rel === 'inhibiting' ? '▼' : '○';
+    var relLabel = d.rel.charAt(0).toUpperCase() + d.rel.slice(1);
+
+    var html = '<b style="color:""" + sky + """">' + fromId + '</b>'
+             + '<span style="color:""" + muted + """"> → </span>'
+             + '<b style="color:""" + orange + """">' + toId + '</b>';
+    html += '<hr style="border-color:""" + bdr + """;margin:4px 0"/>';
+    html += '<b>Relationship:</b> <span style="color:'+relColor+'">' + relIcon + ' ' + relLabel + '</span><br/>';
+    html += '<b>Perturbation:</b> ' + d.perts.join(', ') + '<br/>';
+    html += '<b>Raw effect:</b> '   + d.effs.join(', ')  + '<br/>';
+    html += '<b>Stage(s):</b> '     + d.stages.join(', ') + '<br/>';
+    html += '<b>Evidence:</b> '     + d.count + ' record(s)<br/>';
+
+    if (d.pmids && d.pmids.length > 0) {
+        html += '<hr style="border-color:""" + bdr + """;margin:4px 0"/>';
+        html += '<b>PubMed References:</b><br/>';
+        d.pmids.forEach(function(pmid) {
+            html += '<a href="https://pubmed.ncbi.nlm.nih.gov/' + pmid + '/" target="_blank" '
+                  + 'style="color:""" + sky + """;display:block;margin:3px 0;text-decoration:underline">'
+                  + '&#128196; PMID ' + pmid + '</a>';
+        });
+    }
+
+    if (d.feedback) {
+        html += '<span style="color:""" + orange + """">&#9889; Feedback loop edge</span><br/>';
+    }
+
+    return html;
+}
+
+// Hook into vis.js events after network is ready
+function attachNetworkEvents() {
+    if (!window.network) { setTimeout(attachNetworkEvents, 500); return; }
+
+    // Disable native vis.js tooltip
+    window.network.on('hoverNode', function(params) {
+        var pos = params.event.center || {x: params.event.clientX, y: params.event.clientY};
+        var html = buildNodeTooltip(params.node);
+        showTooltip(html, pos.x, pos.y);
     });
 
-    edgesDS.get().forEach(function(edge) {
-      if (typeof edge.title === 'string' && edge.title.indexOf('<') !== -1) {
-        edgesDS.update({id: edge.id, title: makeDiv(edge.title)});
-      }
+    window.network.on('blurNode', function(params) {
+        hideTooltipDelayed();
     });
-  }
-  setTimeout(applyTitles, 800);
-})();
+
+    window.network.on('hoverEdge', function(params) {
+        var pos = params.event.center || {x: params.event.clientX, y: params.event.clientY};
+        var edge = window.network.body.data.edges.get(params.edge);
+        if (edge) {
+            var html = buildEdgeTooltip(edge.from, edge.to);
+            showTooltip(html, pos.x, pos.y);
+        }
+    });
+
+    window.network.on('blurEdge', function(params) {
+        hideTooltipDelayed();
+    });
+
+    window.network.on('click', function(params) {
+        if (params.nodes.length === 0 && params.edges.length === 0) {
+            tooltip.style.display = 'none';
+        }
+    });
+}
+
+setTimeout(attachNetworkEvents, 800);
 </script>
 """
 
-    # ── Legend button ─────────────────────────────────────────────────────
-    sidebar_bg  = "#0f1525" if theme == "dark" else "#ffffff"
-    sidebar_bdr = "#1e2d4a" if theme == "dark" else "#e2e8f0"
-    sidebar_txt = "#e2e8f0" if theme == "dark" else "#0f172a"
-    mut         = "#475569" if theme == "dark" else "#64748b"
-
-    legend_btn = (
-        "<div id='legend-container' style='position:fixed;bottom:20px;left:20px;z-index:9999'>"
-        "<button onclick='toggleLegend()' style='"
-        "background:" + sidebar_bg + ";border:1px solid " + sidebar_bdr + ";"
-        "border-radius:8px;padding:7px 14px;font-family:monospace;font-size:12px;"
-        "color:" + WONG["sky_blue"] + ";cursor:pointer;"
-        "box-shadow:0 4px 16px rgba(0,0,0,0.3);display:flex;align-items:center;gap:6px'>"
-        "&#128300; Legend <span id='legend-arrow'>&#9650;</span>"
-        "</button>"
-        "<div id='legend-panel' style='display:none;margin-bottom:6px;"
-        "background:" + sidebar_bg + ";border:1px solid " + sidebar_bdr + ";"
-        "border-radius:10px;padding:14px 18px;font-family:monospace;"
-        "font-size:12px;color:" + sidebar_txt + ";"
-        "box-shadow:0 4px 20px rgba(0,0,0,0.3);min-width:220px'>"
-        "<b style='color:" + WONG["sky_blue"] + "'>Lens GRN Legend</b><br/><br/>"
-        "<b style='color:" + mut + ";font-size:10px'>NODE - ROLE</b><br/>"
-        "<span style='color:" + config["color_regulator"] + "'>&#9679;</span> Regulator only<br/>"
-        "<span style='color:" + config["color_target"] + "'>&#9679;</span> Target only<br/>"
-        "<span style='color:" + config["color_both"] + "'>&#9679;</span> Regulator &amp; Target<br/>"
-        "<span style='color:" + config["color_selfloop"] + "'>&#9679;</span> Self-regulatory loop<br/><br/>"
-        "<b style='color:" + mut + ";font-size:10px'>EDGE - RELATIONSHIP</b><br/>"
-        "<span style='color:" + config["color_activating"] + "'>&#9654;</span> Activating<br/>"
-        "<span style='color:" + config["color_inhibiting"] + "'>&#9654;</span> Inhibiting<br/>"
-        "<span style='color:" + config["color_noeffect"] + "'>&#9654;</span> No effect<br/><br/>"
-        "<span style='color:" + mut + ";font-size:10px'>"
-        "Hover edge &#8594; PubMed links<br/>"
-        "Hover node &#8594; expression data<br/>"
-        "Wong (2011) color-blind safe"
-        "</span>"
-        "</div>"
-        "</div>"
-        "<script>"
-        "function toggleLegend(){"
-        "var p=document.getElementById('legend-panel');"
-        "var a=document.getElementById('legend-arrow');"
-        "if(p.style.display==='none'){p.style.display='block';a.innerHTML='&#9660;'}"
-        "else{p.style.display='none';a.innerHTML='&#9650;'}}"
-        "</script>"
-    )
-
-    # ── Compact zoom box ──────────────────────────────────────────────────
-    zoom_box = (
-        "<div style='position:fixed;bottom:20px;right:20px;z-index:9999;"
-        "display:flex;align-items:center;"
-        "background:" + sidebar_bg + ";border:1px solid " + sidebar_bdr + ";"
-        "border-radius:8px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.3)'>"
-        "<button onclick='zoomNet(-0.3)' title='Zoom out' style='"
-        "background:transparent;border:none;border-right:1px solid " + sidebar_bdr + ";"
-        "color:" + sidebar_txt + ";font-size:18px;padding:6px 14px;cursor:pointer;line-height:1'>&#8722;</button>"
-        "<button onclick='zoomNet(0)' title='Fit' style='"
-        "background:transparent;border:none;border-right:1px solid " + sidebar_bdr + ";"
-        "color:#64748b;font-size:14px;padding:6px 10px;cursor:pointer'>&#8635;</button>"
-        "<button onclick='zoomNet(0.3)' title='Zoom in' style='"
-        "background:transparent;border:none;"
-        "color:" + sidebar_txt + ";font-size:18px;padding:6px 14px;cursor:pointer;line-height:1'>&#43;</button>"
-        "</div>"
-        "<script>"
-        "function zoomNet(d){"
-        "if(!window.network)return;"
-        "if(d===0){window.network.fit();return;}"
-        "var s=window.network.getScale();"
-        "window.network.moveTo({scale:Math.max(0.05,Math.min(5,s+d))});}"
-        "</script>"
-    )
-
-    html_str = html_str.replace("</body>",
-        patch_js + legend_btn + zoom_box + "\n</body>")
-
-    return html_str
-
-
-# =============================================================================
-# 7. MAIN VISUALIZE
-# =============================================================================
 
 def visualize(G, analysis, config, mega_lookup=None):
     print("[5/5] Building visualization...")
@@ -593,20 +583,26 @@ def visualize(G, analysis, config, mega_lookup=None):
                       spring_length=200, spring_strength=0.05)
 
     for node in G.nodes():
-        color = _node_color(G, node, analysis, config)
-        in_fb = node in analysis.get("feedback_nodes", set())
-        title = _node_tooltip_html(node, G, analysis, theme, mega_lookup)
+        color    = _node_color(G, node, analysis, config)
+        in_fb    = node in analysis.get("feedback_nodes", set())
+        has_expr = node in mega_lookup
+
+        # Nodes with expression data get a white dashed border ring
+        border_color = "#ffffff" if has_expr else (WONG["yellow"] if in_fb else color)
+        border_width = 3 if has_expr or in_fb else 1
+
         net.add_node(
             node, label=node,
             color={
                 "background": color,
-                "border":     WONG["yellow"] if in_fb else color,
+                "border":     border_color,
                 "highlight":  {"background": "#ffffff", "border": "#000000"},
                 "hover":      {"background": "#ffffff", "border": "#000000"},
             },
             size=_node_size(G, node, config),
-            title=title,
-            borderWidth=3 if in_fb else 1,
+            title="",  # We use custom tooltip, not vis.js title
+            borderWidth=border_width,
+            borderWidthSelected=4,
             font={"color": t["font_color"], "size": 11, "face": "monospace"},
         )
 
@@ -614,11 +610,10 @@ def visualize(G, analysis, config, mega_lookup=None):
         rels  = data.get("relationships", ["no_effect"])
         count = data.get("count", 1)
         is_fb = (u, v) in analysis.get("feedback_edges", set())
-        title = _edge_tooltip_html(u, v, data, analysis, theme)
         net.add_edge(
             u, v,
             color={"color": _edge_color(rels, config), "highlight": "#ffffff", "hover": "#ffffff"},
-            title=title,
+            title="",  # custom tooltip handles this
             width=1.2 + (count * 0.25),
             arrows={"to": {"enabled": True, "scaleFactor": 0.5}},
             dashes=is_fb,
@@ -629,11 +624,12 @@ def visualize(G, analysis, config, mega_lookup=None):
     {
       "interaction": {
         "hover": true,
-        "tooltipDelay": 100,
+        "tooltipDelay": 99999,
         "navigationButtons": false,
         "keyboard": {"enabled": true},
         "multiselect": true,
-        "zoomView": true
+        "zoomView": true,
+        "hoverConnectedEdges": false
       },
       "nodes": {
         "shadow": {"enabled": true, "color": "rgba(0,0,0,0.3)", "size": 8, "x": 2, "y": 2}
@@ -650,7 +646,96 @@ def visualize(G, analysis, config, mega_lookup=None):
     with open(output_path, "r", encoding="utf-8") as f:
         raw = f.read()
 
-    raw = _post_process_html(raw, config, theme, mega_lookup)
+    # Store network reference
+    raw = raw.replace("var network = new vis.Network(", "window.network = new vis.Network(")
+
+    # Build data JS
+    node_data_js, edge_data_js = _build_node_data_js(G, analysis, config, mega_lookup)
+
+    # Build custom tooltip JS and inject data
+    tooltip_js = _build_custom_tooltip_js(config, theme)
+    tooltip_js = tooltip_js.replace('"NODE_DATA_PLACEHOLDER"', node_data_js)
+    tooltip_js = tooltip_js.replace('"EDGE_DATA_PLACEHOLDER"', edge_data_js)
+
+    # Legend button
+    sb_bg  = "#0f1525" if theme == "dark" else "#ffffff"
+    sb_bdr = "#1e2d4a" if theme == "dark" else "#e2e8f0"
+    sb_txt = "#e2e8f0" if theme == "dark" else "#0f172a"
+    mut    = "#475569" if theme == "dark" else "#64748b"
+
+    legend = (
+        "<div id='legend-container' style='position:fixed;bottom:20px;left:20px;z-index:9998'>"
+        "<div id='legend-panel' style='display:none;margin-bottom:6px;"
+        "background:" + sb_bg + ";border:1px solid " + sb_bdr + ";"
+        "border-radius:10px;padding:14px 18px;font-family:monospace;"
+        "font-size:12px;color:" + sb_txt + ";box-shadow:0 4px 20px rgba(0,0,0,0.3);min-width:230px'>"
+        "<b style='color:" + WONG["sky_blue"] + "'>Lens GRN Legend</b><br/><br/>"
+        "<b style='color:" + mut + ";font-size:10px'>NODE - ROLE</b><br/>"
+        "<span style='color:" + config["color_regulator"] + "'>&#9679;</span> Regulator only<br/>"
+        "<span style='color:" + config["color_target"] + "'>&#9679;</span> Target only<br/>"
+        "<span style='color:" + config["color_both"] + "'>&#9679;</span> Regulator &amp; Target<br/>"
+        "<span style='color:" + config["color_selfloop"] + "'>&#9679;</span> Self-regulatory loop<br/>"
+        "<span style='color:#ffffff'>&#9711;</span> White border = has expression data<br/><br/>"
+        "<b style='color:" + mut + ";font-size:10px'>EDGE - RELATIONSHIP</b><br/>"
+        "<span style='color:" + config["color_activating"] + "'>&#9654;</span> Activating (Pert x Effect)<br/>"
+        "<span style='color:" + config["color_inhibiting"] + "'>&#9654;</span> Inhibiting (Pert x Effect)<br/>"
+        "<span style='color:" + config["color_noeffect"] + "'>&#9654;</span> No effect<br/>"
+        "<span style='border:1px dashed #888;display:inline-block;width:20px'>&nbsp;</span> Dashed = feedback loop<br/><br/>"
+        "<span style='color:" + mut + ";font-size:10px'>"
+        "Hover edge/node for details &amp; links<br/>"
+        "Wong (2011) color-blind safe palette"
+        "</span>"
+        "</div>"
+        "<button onclick='toggleLegend()' style='"
+        "background:" + sb_bg + ";border:1px solid " + sb_bdr + ";"
+        "border-radius:8px;padding:7px 14px;font-family:monospace;font-size:12px;"
+        "color:" + WONG["sky_blue"] + ";cursor:pointer;"
+        "box-shadow:0 4px 16px rgba(0,0,0,0.3);display:flex;align-items:center;gap:6px'>"
+        "&#128300; Legend <span id='legend-arrow'>&#9650;</span>"
+        "</button>"
+        "</div>"
+        "<script>"
+        "function toggleLegend(){"
+        "var p=document.getElementById('legend-panel');"
+        "var a=document.getElementById('legend-arrow');"
+        "if(p.style.display==='none'){p.style.display='block';a.innerHTML='&#9660;'}"
+        "else{p.style.display='none';a.innerHTML='&#9650;'}}"
+        "</script>"
+    )
+
+    # Compact zoom
+    zoom = (
+        "<div style='position:fixed;bottom:20px;right:20px;z-index:9998;"
+        "display:flex;align-items:center;"
+        "background:" + sb_bg + ";border:1px solid " + sb_bdr + ";"
+        "border-radius:8px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.3)'>"
+        "<button onclick='zoomNet(-0.3)' style='background:transparent;border:none;"
+        "border-right:1px solid " + sb_bdr + ";color:" + sb_txt + ";"
+        "font-size:18px;padding:6px 14px;cursor:pointer;line-height:1'>&#8722;</button>"
+        "<button onclick='zoomNet(0)' style='background:transparent;border:none;"
+        "border-right:1px solid " + sb_bdr + ";color:#64748b;"
+        "font-size:14px;padding:6px 10px;cursor:pointer'>&#8635;</button>"
+        "<button onclick='zoomNet(0.3)' style='background:transparent;border:none;"
+        "color:" + sb_txt + ";font-size:18px;padding:6px 14px;cursor:pointer;line-height:1'>&#43;</button>"
+        "</div>"
+        "<script>"
+        "function zoomNet(d){"
+        "if(!window.network)return;"
+        "if(d===0){window.network.fit();return;}"
+        "window.network.moveTo({scale:Math.max(0.05,Math.min(5,window.network.getScale()+d))});}"
+        "</script>"
+    )
+
+    # CSS — hide vis.js native tooltip completely
+    css = (
+        "<style>"
+        "div.vis-tooltip { display: none !important; }"
+        "body { margin:0; overflow:hidden; }"
+        "</style>"
+    )
+
+    raw = raw.replace("</head>", css + "\n</head>")
+    raw = raw.replace("</body>", tooltip_js + legend + zoom + "\n</body>")
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(raw)
@@ -668,13 +753,9 @@ def print_summary(G, analysis):
     regs = sum(1 for n in G.nodes() if G.nodes[n].get("is_reg") and not G.nodes[n].get("is_tgt"))
     tgts = sum(1 for n in G.nodes() if G.nodes[n].get("is_tgt") and not G.nodes[n].get("is_reg"))
     both = sum(1 for n in G.nodes() if G.nodes[n].get("is_reg") and G.nodes[n].get("is_tgt"))
-    print("  Nodes: " + str(G.number_of_nodes()) +
-          " | Edges: " + str(G.number_of_edges()) +
-          " | Regs: " + str(regs) + " | Targets: " + str(tgts) + " | Both: " + str(both))
-    print("  TOP HUBS:")
-    for gene, deg in analysis.get("hub_genes", []):
-        print("    " + gene.ljust(25) + str(deg).rjust(4))
-    print("  Feedback loops: " + str(len(analysis.get("feedback_loops",[]))) +
+    print("  Nodes: " + str(G.number_of_nodes()) + " | Edges: " + str(G.number_of_edges()))
+    print("  Regs: " + str(regs) + " | Targets: " + str(tgts) + " | Both: " + str(both))
+    print("  Feedback: " + str(len(analysis.get("feedback_loops",[]))) +
           " | Self-loops: " + str(len(analysis.get("self_loops",[]))))
     print("="*60 + "\n")
 
@@ -696,10 +777,8 @@ def main():
     df, G, analysis, mega_lookup = run_pipeline(CONFIG)
     if G is None: sys.exit(1)
     print_summary(G, analysis)
-    output   = visualize(G, analysis, CONFIG, mega_lookup)
-    abs_path = os.path.abspath(output)
-    print("  Opening -> " + abs_path)
-    webbrowser.open("file://" + abs_path)
+    output = visualize(G, analysis, CONFIG, mega_lookup)
+    webbrowser.open("file://" + os.path.abspath(output))
 
 
 if __name__ == "__main__":
