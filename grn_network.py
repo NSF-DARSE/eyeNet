@@ -2,22 +2,12 @@
 =============================================================================
 Lens GRN Explorer — NetworkX core
 =============================================================================
-Pure graph logic. Visualization handled by Dash + Cytoscape in app.py.
-
-TO ADD NEW DATA SOURCES:
-    Add a new entry to DATA_SOURCES in app.py.
-    Each source needs: path, label, symbol_col, and sections.
-=============================================================================
 """
 
 import os, sys
 import pandas as pd
 import networkx as nx
 from collections import Counter
-
-# =============================================================================
-# WONG (2011) color-blind safe palette
-# =============================================================================
 
 WONG = {
     "black":      "#000000",
@@ -30,14 +20,9 @@ WONG = {
     "pink":       "#CC79A7",
 }
 
-# =============================================================================
-# THEMES
-# =============================================================================
-
 THEMES = {
     "light": {
         "bgcolor":     "#f8fafc",
-        "font_color":  "#0f172a",
         "panel_bg":    "#ffffff",
         "panel_bdr":   "#e2e8f0",
         "sidebar_bg":  "#f1f5f9",
@@ -47,14 +32,9 @@ THEMES = {
         "row_bg":      "#f8fafc",
         "topbar_bg":   "#ffffff",
         "topbar_bdr":  "#e2e8f0",
-        "section_bg":  "#f1f5f9",
-        "section_bdr": "#e2e8f0",
-        "tag_bg":      "#e0f2fe",
-        "tag_text":    "#0369a1",
     },
     "dark": {
         "bgcolor":     "#0a0e1a",
-        "font_color":  "#e2e8f0",
         "panel_bg":    "#0f1525",
         "panel_bdr":   "#1e2d4a",
         "sidebar_bg":  "#0f1525",
@@ -64,16 +44,8 @@ THEMES = {
         "row_bg":      "#1a2540",
         "topbar_bg":   "#0f1525",
         "topbar_bdr":  "#1e2d4a",
-        "section_bg":  "#1a2540",
-        "section_bdr": "#1e2d4a",
-        "tag_bg":      "#1e3a5f",
-        "tag_text":    "#56B4E9",
     },
 }
-
-# =============================================================================
-# CONFIG
-# =============================================================================
 
 CONFIG = {
     "input_file":  "data/Lens_GRN_June_2016_original FOR HACKATHON - Salil Lachke.xlsx",
@@ -81,16 +53,14 @@ CONFIG = {
     "stage_from":   None,
     "stage_to":     None,
     "stage_single": None,
-    "filter_regulator": None,
-    "filter_target":    None,
+    "filter_regulator":    None,
+    "filter_target":       None,
+    "filter_tissue_reg":   None,
+    "filter_tissue_tgt":   None,
     "relationships_include": ["activating", "inhibiting", "no_effect"],
-    "max_edges":            300,
-    "show_feedback_loops":  True,
+    "max_edges":             300,
+    "show_feedback_loops":   True,
 }
-
-# =============================================================================
-# GRN DATA LOADING
-# =============================================================================
 
 def load_data(config):
     path = config["input_file"]
@@ -101,20 +71,29 @@ def load_data(config):
     df = pd.read_excel(path, sheet_name=config["sheet_name"])
     df.columns = [str(c).strip() for c in df.columns]
     col_map = {
-        df.columns[0]: "sno",      df.columns[1]: "regulator",
-        df.columns[2]: "target",   df.columns[4]: "perturbation",
-        df.columns[5]: "effect",   df.columns[6]: "stage",
-        df.columns[7]: "context",  df.columns[20]: "reference",
+        df.columns[0]:  "sno",
+        df.columns[1]:  "regulator",
+        df.columns[2]:  "target",
+        df.columns[4]:  "perturbation",
+        df.columns[5]:  "effect",
+        df.columns[6]:  "stage",
+        df.columns[7]:  "context",
+        df.columns[12]: "tissue_reg",
+        df.columns[13]: "tissue_tgt",
+        df.columns[20]: "reference",
         df.columns[21]: "pmid",
     }
     df = df.rename(columns=col_map)
-    df = df[["sno","regulator","target","perturbation","effect",
-             "stage","context","reference","pmid"]]
+    df = df[["sno","regulator","target","perturbation","effect","stage",
+             "context","tissue_reg","tissue_tgt","reference","pmid"]]
     df = df.dropna(subset=["regulator","target"])
-    for c in ["regulator","target","perturbation","effect","stage","context"]:
+    for c in ["regulator","target","perturbation","effect","stage","context",
+              "tissue_reg","tissue_tgt"]:
         df[c] = df[c].astype(str).str.strip()
     df["effect"]       = df["effect"].replace({"nan":"o","none":"o","None":"o","0":"o"})
     df["perturbation"] = df["perturbation"].replace({"nan":"-","none":"-","None":"-"})
+    df["tissue_reg"]   = df["tissue_reg"].replace({"nan":"Unknown","fiber cells":"Fiber cells"})
+    df["tissue_tgt"]   = df["tissue_tgt"].replace({"nan":"Unknown","fiber cells":"Fiber cells"})
     def clean_pmid(v):
         try:
             if pd.notna(v): return str(int(float(v)))
@@ -125,35 +104,22 @@ def load_data(config):
     print("[GRN] Loaded " + str(len(df)) + " edges")
     return df
 
-
 def _compute_relationship(row):
     pert   = str(row["perturbation"]).strip()
     effect = str(row["effect"]).strip()
     if effect == "o": return "no_effect"
     return "activating" if pert == effect else "inhibiting"
 
-# =============================================================================
-# EXTERNAL DATA LOADING
-# =============================================================================
-
 def _find_file(path):
-    """Try original path then common variations."""
-    if os.path.exists(path):
-        return path
+    if os.path.exists(path): return path
     for p in [
         path.replace(" ","_").replace("(","").replace(")",""),
         path.replace("_"," "),
     ]:
-        if os.path.exists(p):
-            return p
+        if os.path.exists(p): return p
     return None
 
-
 def load_external_data(data_sources: dict) -> dict:
-    """
-    Load all external data sources defined in DATA_SOURCES.
-    Returns: { source_key -> { gene_symbol -> { display_col -> value, _meta_* } } }
-    """
     result = {}
     for key, src in data_sources.items():
         real_path = _find_file(src.get("path",""))
@@ -161,46 +127,32 @@ def load_external_data(data_sources: dict) -> dict:
             print("[WARN] Not found: " + src.get("path",""))
             result[key] = {}
             continue
-
-        print("[DATA] Loading " + src.get("label", key) + ": " + real_path)
+        print("[DATA] Loading " + src.get("label",key) + ": " + real_path)
         try:
             df = pd.read_excel(real_path)
             sym_col = src.get("symbol_col","Symbol")
             lookup  = {}
-
             for _, row in df.iterrows():
                 sym = str(row.get(sym_col,"")).strip()
-                if not sym or sym == "nan":
-                    continue
+                if not sym or sym == "nan": continue
                 gene_data = {}
-
-                # Extract section columns
-                for section in src.get("sections", []):
+                for section in src.get("sections",[]):
                     for display_name, excel_col in section.get("columns",{}).items():
                         v = row.get(excel_col)
                         try:
-                            gene_data[display_name] = round(float(v),3) if pd.notna(v) else None
+                            gene_data[display_name] = round(float(v),1) if pd.notna(v) else None
                         except:
                             gene_data[display_name] = str(v) if pd.notna(v) else None
-
-                # Extract meta columns
                 for meta_key, excel_col in src.get("meta_cols",{}).items():
                     v = row.get(excel_col)
-                    gene_data["_meta_" + meta_key] = str(v) if (v is not None and pd.notna(v)) else ""
-
+                    gene_data["_meta_"+meta_key] = str(v) if (v is not None and pd.notna(v)) else ""
                 lookup[sym] = gene_data
-
             result[key] = lookup
             print("[DATA]   -> " + str(len(lookup)) + " genes")
         except Exception as e:
             print("[WARN] Failed loading " + key + ": " + str(e))
             result[key] = {}
-
     return result
-
-# =============================================================================
-# FILTERING
-# =============================================================================
 
 def stage_numeric(stage):
     s = str(stage).strip()
@@ -211,29 +163,28 @@ def stage_numeric(stage):
     except ValueError: pass
     return 99999.0
 
-
 def filter_data(df, config):
     original = len(df)
     df = df[df["true_relationship"].isin(config["relationships_include"])]
-    if config["stage_single"]:
+    if config.get("stage_single"):
         df = df[df["stage"] == config["stage_single"]]
     else:
-        if config["stage_from"]:
+        if config.get("stage_from"):
             df = df[df["stage"].apply(stage_numeric) >= stage_numeric(config["stage_from"])]
-        if config["stage_to"]:
+        if config.get("stage_to"):
             df = df[df["stage"].apply(stage_numeric) <= stage_numeric(config["stage_to"])]
-    if config["filter_regulator"]:
+    if config.get("filter_regulator"):
         df = df[df["regulator"] == config["filter_regulator"]]
-    if config["filter_target"]:
+    if config.get("filter_target"):
         df = df[df["target"] == config["filter_target"]]
-    if config["max_edges"] and len(df) > config["max_edges"]:
+    if config.get("filter_tissue_reg"):
+        df = df[df["tissue_reg"] == config["filter_tissue_reg"]]
+    if config.get("filter_tissue_tgt"):
+        df = df[df["tissue_tgt"] == config["filter_tissue_tgt"]]
+    if config.get("max_edges") and len(df) > config["max_edges"]:
         df = df.head(config["max_edges"])
     print("[FILTER] " + str(original) + " -> " + str(len(df)) + " edges")
     return df.reset_index(drop=True)
-
-# =============================================================================
-# GRAPH BUILDING
-# =============================================================================
 
 def build_graph(df):
     G = nx.DiGraph()
@@ -247,6 +198,8 @@ def build_graph(df):
         stg       = row["stage"]
         rel       = row["true_relationship"]
         pmid      = str(row.get("pmid","")).strip()
+        t_reg     = row.get("tissue_reg","")
+        t_tgt     = row.get("tissue_tgt","")
         if G.has_edge(reg, tgt):
             G[reg][tgt]["perturbations"].append(pert)
             G[reg][tgt]["effects"].append(eff)
@@ -258,29 +211,24 @@ def build_graph(df):
         else:
             G.add_edge(reg, tgt,
                 perturbations=[pert], effects=[eff], relationships=[rel],
-                stages=[stg], count=1, pmids=[pmid] if pmid else [])
+                stages=[stg], count=1, pmids=[pmid] if pmid else [],
+                tissue_reg=t_reg, tissue_tgt=t_tgt)
     return G
 
-# =============================================================================
-# ANALYSIS
-# =============================================================================
-
 def analyze_graph(G, config):
-    results     = {}
-    in_deg      = dict(G.in_degree())
-    out_deg     = dict(G.out_degree())
-    deg_c       = nx.degree_centrality(G)
+    results = {}
+    in_deg  = dict(G.in_degree())
+    out_deg = dict(G.out_degree())
     for node in G.nodes():
-        G.nodes[node]["in_degree"]      = in_deg[node]
-        G.nodes[node]["out_degree"]     = out_deg[node]
-        G.nodes[node]["total_degree"]   = in_deg[node] + out_deg[node]
-        G.nodes[node]["deg_centrality"] = round(deg_c[node], 4)
-    results["hub_genes"]       = sorted(out_deg.items(), key=lambda x: x[1], reverse=True)[:10]
-    results["feedback_nodes"]  = set()
-    results["feedback_edges"]  = set()
-    results["feedback_loops"]  = []
-    results["self_loops"]      = []
-    if config["show_feedback_loops"]:
+        G.nodes[node]["in_degree"]    = in_deg[node]
+        G.nodes[node]["out_degree"]   = out_deg[node]
+        G.nodes[node]["total_degree"] = in_deg[node] + out_deg[node]
+    results["hub_genes"]      = sorted(out_deg.items(), key=lambda x: x[1], reverse=True)[:10]
+    results["feedback_nodes"] = set()
+    results["feedback_edges"] = set()
+    results["feedback_loops"] = []
+    results["self_loops"]     = []
+    if config.get("show_feedback_loops"):
         try:
             for i, cycle in enumerate(nx.simple_cycles(G)):
                 if i > 500: break
@@ -292,10 +240,6 @@ def analyze_graph(G, config):
         results["self_loops"] = list(nx.selfloop_edges(G))
     results["components"] = list(nx.weakly_connected_components(G))
     return results
-
-# =============================================================================
-# CYTOSCAPE ELEMENTS
-# =============================================================================
 
 def build_cytoscape_elements(G, analysis, config, ext_data):
     elements       = []
@@ -325,7 +269,6 @@ def build_cytoscape_elements(G, analysis, config, ext_data):
                 "deg":       deg,
                 "out_deg":   d.get("out_degree", 0),
                 "in_deg":    d.get("in_degree", 0),
-                "cent":      d.get("deg_centrality", 0),
                 "feedback":  node in feedback_nodes,
                 "self_loop": node in self_loop_nodes,
             },
@@ -342,17 +285,18 @@ def build_cytoscape_elements(G, analysis, config, ext_data):
 
         elements.append({
             "data": {
-                "id":      u + "__" + v,
-                "source":  u,
-                "target":  v,
-                "rel":     dom,
-                "perts":   sorted(set(data.get("perturbations",[]))),
-                "effs":    sorted(set(data.get("effects",[]))),
-                "stages":  sorted(set(
-                               str(s) for s in data.get("stages",[]) if pd.notna(s)))[:6],
-                "count":   count,
-                "pmids":   pmids[:8],
-                "feedback":is_fb,
+                "id":       u + "__" + v,
+                "source":   u,
+                "target":   v,
+                "rel":      dom,
+                "perts":    sorted(set(data.get("perturbations",[]))),
+                "effs":     sorted(set(data.get("effects",[]))),
+                "stages":   sorted(set(str(s) for s in data.get("stages",[]) if pd.notna(s)))[:6],
+                "count":    count,
+                "pmids":    pmids[:8],
+                "feedback": is_fb,
+                "tissue_reg": data.get("tissue_reg",""),
+                "tissue_tgt": data.get("tissue_tgt",""),
             },
             "classes": classes,
         })
