@@ -2,6 +2,12 @@
 =============================================================================
 Lens GRN Explorer — Dash 4.0 + Cytoscape
 =============================================================================
+Key fixes in this version:
+  1. RNA-seq expression merged into single data panel (not separate dropdown)
+  2. Node re-drag fixed (unlock on mousedown, re-lock on dragfree)
+  3. Split network view when tissue of regulator != tissue of target
+  4. RNA-seq data correctly loaded via symbol_col="Symbol"
+=============================================================================
 """
 
 import os, copy, json
@@ -21,20 +27,28 @@ from grn_network import (
 cyto.load_extra_layouts()
 
 # =============================================================================
-# DATA SOURCES
+# SINGLE DATA SOURCE — all expression data in one panel
 # =============================================================================
 
 DATA_SOURCES = {
-    "microarray": {
-        "label":      "Microarray Data",
-        "icon":       "🔬",
+    "all_expression": {
+        "label":      "Expression & Enrichment",
+        "icon":       "📊",
+        # Primary file — microarray expression + enrichment + RNA-seq enrichment
         "path":       "data/MegaTable April 24 2024 for Microarray and RNA Seq Sent to Murali (1).xls",
         "symbol_col": "Symbol",
         "meta_cols":  {"entrez":"Entrez","uniprot":"UNIPROT","description":"Gene_description"},
+        # Secondary file — RNA-seq LogCPM expression values
+        "extra_paths": [
+            {
+                "path":       "data/LogCPM_FPKM_TPM_FiberEpi120225 USE THIS FEB 13 2025.xls",
+                "symbol_col": "Symbol",
+            }
+        ],
         "sections": [
             {
                 "title":        "Microarray Expression (raw counts)",
-                "description":  "Raw expression counts — Epi first, then Fiber.",
+                "description":  "Raw expression counts. Epi first, then Fiber.",
                 "color_values": False,
                 "columns": {
                     "Epi E12 (Beebe)":   "Beebe_E12_exp_Epi",
@@ -45,7 +59,7 @@ DATA_SOURCES = {
             },
             {
                 "title":        "Microarray Enrichment (log2 FC)",
-                "description":  "log2 fold change. Epi first, then Fiber.",
+                "description":  "log2 fold change. Positive = enriched. Epi first, then Fiber.",
                 "color_values": True,
                 "columns": {
                     "Epi E12":   "Beebe_E12_Epi_enr",
@@ -56,41 +70,32 @@ DATA_SOURCES = {
             },
             {
                 "title":        "RNA-seq Enrichment (LEC then FC by stage)",
-                "description":  "LEC (Epi) first, then FC (Fiber) per stage, ascending stage order.",
+                "description":  "LEC = lens epithelial cell (Epi), FC = fiber cell. Positive = enriched.",
                 "color_values": True,
                 "columns": {
-                    "LEC E14":"enr_LEC_E14_Cv","FC E14":"enr_FC_E14_Cv",
-                    "LEC E16":"enr_LEC_E16_Cv","FC E16":"enr_FC_E16_Cv",
-                    "LEC E18":"enr_LEC_E18_Cv","FC E18":"enr_FC_E18_Cv",
-                    "LEC P0": "enr_LEC_P0_Cv", "FC P0": "enr_FC_P0_Cv",
-                    "LEC P0R":"enr_LEC_P0_Rob","FC P0R":"enr_FC_P0_Rob",
-                    "LEC 3Mo":"enr_LEC_3Mo",   "FC 3Mo":"enr_FC_3Mo",
-                    "LEC 6Mo":"enr_LEC_6Mo",   "FC 6Mo":"enr_FC_6Mo",
-                    "LEC 2Y": "enr_LEC_2Y",    "FC 2Y": "enr_FC_2Y",
+                    "LEC E14": "enr_LEC_E14_Cv", "FC E14": "enr_FC_E14_Cv",
+                    "LEC E16": "enr_LEC_E16_Cv", "FC E16": "enr_FC_E16_Cv",
+                    "LEC E18": "enr_LEC_E18_Cv", "FC E18": "enr_FC_E18_Cv",
+                    "LEC P0":  "enr_LEC_P0_Cv",  "FC P0":  "enr_FC_P0_Cv",
+                    "LEC P0R": "enr_LEC_P0_Rob", "FC P0R": "enr_FC_P0_Rob",
+                    "LEC 3Mo": "enr_LEC_3Mo",    "FC 3Mo": "enr_FC_3Mo",
+                    "LEC 6Mo": "enr_LEC_6Mo",    "FC 6Mo": "enr_FC_6Mo",
+                    "LEC 2Y":  "enr_LEC_2Y",     "FC 2Y":  "enr_FC_2Y",
                 },
             },
-        ],
-    },
-    "rnaseq_expr": {
-        "label":      "RNA-seq Expression",
-        "icon":       "📈",
-        "path":       "data/LogCPM_FPKM_TPM_FiberEpi120225_USE_THIS_FEB_13_2025.xls",
-        "symbol_col": "Symbol",
-        "meta_cols":  {"entrez":"Entrez","uniprot":"UNIPROT"},
-        "sections": [
             {
-                "title":        "RNA-seq Expression (LogCPM) — Epi then Fiber by stage",
-                "description":  "Log CPM values. Epi first, Fiber second, ascending stage order.",
+                "title":        "RNA-seq Expression (LogCPM) — Epi then Fiber",
+                "description":  "Log CPM expression values. Epi first, Fiber second, ascending stage.",
                 "color_values": False,
                 "columns": {
-                    "Epi E14":"E14_LogCPM_Epi",   "Fiber E14":"E14_LogCPM_Fiber",
-                    "Epi E16":"E16_LogCPM_Epi",   "Fiber E16":"E16_LogCPM_Fiber",
-                    "Epi E18":"E18_LogCPM_Epi",   "Fiber E18":"E18_LogCPM_Fiber",
-                    "Epi P0b":"P0b_LogCPM_Epi",   "Fiber P0b":"P0b_LogCPM_Fiber",
-                    "Epi P0": "P0_LogCPM_Epi",    "Fiber P0": "P0_LogCPM_Fiber",
-                    "Epi 3Mo":"3Mo_LogCPM_Epi",   "Fiber 3Mo":"3Mo_LogCPM_Fiber",
-                    "Epi 6Mo":"6Mo_LogCPM_Epi",   "Fiber 6Mo":"6Mo_LogCPM_Fiber",
-                    "Epi 2Y": "2Y_LogCPM_Epi",    "Fiber 2Y": "2Y_LogCPM_Fiber",
+                    "Epi P0b":   "P0b_LogCPM_Epi",  "Fiber P0b": "P0b_LogCPM_Fiber",
+                    "Epi E14":   "E14_LogCPM_Epi",   "Fiber E14": "E14_LogCPM_Fiber",
+                    "Epi E16":   "E16_LogCPM_Epi",   "Fiber E16": "E16_LogCPM_Fiber",
+                    "Epi E18":   "E18_LogCPM_Epi",   "Fiber E18": "E18_LogCPM_Fiber",
+                    "Epi P0":    "P0_LogCPM_Epi",    "Fiber P0":  "P0_LogCPM_Fiber",
+                    "Epi 3Mo":   "3Mo_LogCPM_Epi",   "Fiber 3Mo": "3Mo_LogCPM_Fiber",
+                    "Epi 6Mo":   "6Mo_LogCPM_Epi",   "Fiber 6Mo": "6Mo_LogCPM_Fiber",
+                    "Epi 2Y":    "2Y_LogCPM_Epi",    "Fiber 2Y":  "2Y_LogCPM_Fiber",
                 },
             },
         ],
@@ -108,8 +113,12 @@ EXT_DATA = load_external_data(DATA_SOURCES)
 ALL_STAGES     = sorted(BASE_DF["stage"].dropna().unique(), key=stage_numeric)
 ALL_REGULATORS = sorted(BASE_DF["regulator"].dropna().unique())
 ALL_TARGETS    = sorted(BASE_DF["target"].dropna().unique())
-ALL_TISSUE_REG = sorted([t for t in BASE_DF["tissue_reg"].dropna().unique() if t and t!="nan"])
-ALL_TISSUE_TGT = sorted([t for t in BASE_DF["tissue_tgt"].dropna().unique() if t and t!="nan"])
+ALL_TISSUE_REG = sorted([t for t in BASE_DF["tissue_reg"].dropna().unique() if t and t not in ("nan","Unknown")])
+ALL_TISSUE_TGT = sorted([t for t in BASE_DF["tissue_tgt"].dropna().unique() if t and t not in ("nan","Unknown")])
+
+# Log what loaded
+for key, lookup in EXT_DATA.items():
+    print(f"[APP] {DATA_SOURCES[key]['label']}: {len(lookup)} genes")
 print("[APP] Ready\n")
 
 def stage_opts(s): return [{"label":x,"value":x} for x in s]
@@ -136,7 +145,6 @@ def build_stylesheet(theme="light"):
         {"selector":"node.selfloop", "style":{"background-color":WONG["yellow"],  "border-color":WONG["yellow"]}},
         {"selector":"node.feedback", "style":{"border-width":"4px","border-color":WONG["yellow"]}},
         {"selector":"node:selected", "style":{"border-width":"4px","border-color":"#1d4ed8","overlay-color":"#1d4ed8","overlay-opacity":0.1}},
-        {"selector":"node:grabbed",  "style":{"border-width":"3px","border-color":"#1d4ed8"}},
         {"selector":"edge","style":{
             "curve-style":"bezier","target-arrow-shape":"triangle",
             "arrow-scale":0.9,"width":2,"opacity":0.75,"cursor":"pointer",
@@ -160,7 +168,7 @@ app = dash.Dash(
 )
 
 GLOBAL_CSS = """
-    body { margin:0; font-family:sans-serif; overflow:hidden; }
+    body{margin:0;font-family:sans-serif;overflow:hidden;}
     .Select-control{background:#fff !important;border-color:#cbd5e1 !important;}
     .Select-value-label,.Select--single .Select-value .Select-value-label{color:#0f172a !important;}
     .Select-placeholder{color:#94a3b8 !important;}
@@ -181,6 +189,24 @@ GLOBAL_CSS = """
         box-shadow:0 4px 24px rgba(0,0,0,0.13);max-width:260px;min-width:160px;
         display:none;top:70px;right:320px;
     }
+    /* Graph area container for split view */
+    #graph-area{
+        flex:1;display:flex;flex-direction:row;overflow:hidden;position:relative;
+    }
+    .graph-pane{
+        flex:1;position:relative;overflow:hidden;
+    }
+    .graph-pane-label{
+        position:absolute;top:10px;left:50%;transform:translateX(-50%);
+        z-index:100;background:rgba(255,255,255,0.92);border:1px solid #e2e8f0;
+        border-radius:8px;padding:4px 12px;font-family:monospace;font-size:11px;
+        color:#0369a1;font-weight:bold;pointer-events:none;
+        box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    }
+    .graph-divider{
+        width:3px;background:#e2e8f0;flex-shrink:0;
+    }
+    /* Overlay controls */
     #legend-overlay{position:absolute;bottom:24px;left:16px;z-index:1000;font-family:monospace;}
     #legend-panel{
         display:none;margin-bottom:6px;padding:14px 16px;border-radius:10px;font-size:12px;
@@ -227,54 +253,95 @@ GLOBAL_CSS = """
     ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
 """
 
-# Inject JS separately — not via onClick props (Dash 4.0 removed arbitrary event attrs)
 INIT_JS = """
 <script>
+// ── Attach drag-lock to a single Cytoscape instance by element id ─────────
+function attachDragLock(elId) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  var poll = setInterval(function() {
+    try {
+      var cy = el._cyreg && el._cyreg.cy;
+      if (!cy) return;
+      clearInterval(poll);
+      // After layout: unlock all so initial layout runs free, then re-arm
+      cy.on('layoutstop', function() {
+        cy.nodes().unlock();
+        armDragLock(cy);
+      });
+      armDragLock(cy);
+    } catch(e) {}
+  }, 400);
+}
+
+function armDragLock(cy) {
+  cy.off('mousedown', 'node');
+  cy.off('dragfree', 'node');
+  // Unlock on mousedown so node can be dragged again
+  cy.on('mousedown', 'node', function(e) {
+    e.target.unlock();
+  });
+  // Re-lock on release
+  cy.on('dragfree', 'node', function(e) {
+    e.target.lock();
+  });
+}
+
 (function() {
-  function attachCy() {
-    var el = document.getElementById('cytoscape-graph');
-    if (!el) { setTimeout(attachCy, 600); return; }
-    var poll = setInterval(function() {
-      try {
-        var cy = el._cyreg && el._cyreg.cy;
-        if (!cy) return;
-        clearInterval(poll);
-        cy.on('layoutstop', function() {
-          cy.nodes().unlock();
-          cy.on('dragfree', 'node', function(e) { e.target.lock(); });
-        });
-        cy.on('dragfree', 'node', function(e) { e.target.lock(); });
-      } catch(e) {}
-    }, 400);
+  function init() {
+    attachDragLock('cytoscape-graph');
+    attachDragLock('cytoscape-graph-2');
   }
-  document.addEventListener('DOMContentLoaded', attachCy);
+  document.addEventListener('DOMContentLoaded', init);
+  // Re-attach after Dash re-renders (theme toggle, filter apply)
+  var observer = new MutationObserver(function() {
+    attachDragLock('cytoscape-graph');
+    attachDragLock('cytoscape-graph-2');
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
 
-function _cy() {
-  var el=document.getElementById('cytoscape-graph');
-  if(!el) return null;
-  try{return el._cyreg&&el._cyreg.cy;}catch(e){return null;}
-}
-function grn_zoomOut(){ var cy=_cy();if(!cy)return; cy.zoom({level:Math.max(0.05,cy.zoom()-0.3),renderedPosition:{x:cy.width()/2,y:cy.height()/2}}); }
-function grn_zoomFit(){ var cy=_cy();if(!cy)return; cy.fit(undefined,30); }
-function grn_zoomIn(){  var cy=_cy();if(!cy)return; cy.zoom({level:Math.min(3,cy.zoom()+0.3),renderedPosition:{x:cy.width()/2,y:cy.height()/2}}); }
-function grn_saveImage(){
-  var cy=_cy(); if(!cy) return;
-  try {
-    var png=cy.png({output:'blob',bg:'white',full:true,scale:2});
-    var url=URL.createObjectURL(png);
-    var a=document.createElement('a'); a.href=url; a.download='lens_grn.png'; a.click();
-    URL.revokeObjectURL(url);
-  } catch(e) { console.error('Save PNG failed:', e); }
-}
-function grn_toggleLegend(){
-  var p=document.getElementById('legend-panel');
-  var a=document.getElementById('legend-arrow');
-  if(!p) return;
-  if(p.style.display==='none'||p.style.display===''){
+// ── Legend ─────────────────────────────────────────────────────────────────
+function grn_toggleLegend() {
+  var p = document.getElementById('legend-panel');
+  var a = document.getElementById('legend-arrow');
+  if (!p) return;
+  if (p.style.display==='none'||p.style.display==='') {
     p.style.display='block'; if(a) a.textContent='▼';
   } else {
     p.style.display='none'; if(a) a.textContent='▲';
+  }
+}
+
+// ── Zoom (operates on first visible Cytoscape) ─────────────────────────────
+function _getActiveCy() {
+  for (var id of ['cytoscape-graph','cytoscape-graph-2']) {
+    var el = document.getElementById(id);
+    if (el && el.style.display!=='none') {
+      try { var cy=el._cyreg&&el._cyreg.cy; if(cy) return cy; } catch(e){}
+    }
+  }
+  var el2 = document.getElementById('cytoscape-graph');
+  if(el2) { try { return el2._cyreg&&el2._cyreg.cy; } catch(e){} }
+  return null;
+}
+function grn_zoomOut(){ var cy=_getActiveCy();if(!cy)return; cy.zoom({level:Math.max(0.05,cy.zoom()-0.3),renderedPosition:{x:cy.width()/2,y:cy.height()/2}}); }
+function grn_zoomFit(){ var cy=_getActiveCy();if(!cy)return; cy.fit(undefined,30); }
+function grn_zoomIn(){  var cy=_getActiveCy();if(!cy)return; cy.zoom({level:Math.min(3,cy.zoom()+0.3),renderedPosition:{x:cy.width()/2,y:cy.height()/2}}); }
+
+// ── Save PNG (saves both graphs if split view) ─────────────────────────────
+function grn_saveImage() {
+  for (var id of ['cytoscape-graph','cytoscape-graph-2']) {
+    var el = document.getElementById(id);
+    if (!el || el.closest('[style*="display: none"]')) continue;
+    try {
+      var cy=el._cyreg&&el._cyreg.cy; if(!cy) continue;
+      var png=cy.png({output:'blob',bg:'white',full:true,scale:2});
+      var url=URL.createObjectURL(png);
+      var a=document.createElement('a'); a.href=url;
+      a.download='lens_grn_'+id+'.png'; a.click();
+      URL.revokeObjectURL(url);
+    } catch(e){ console.error(e); }
   }
 }
 </script>
@@ -292,56 +359,26 @@ app.index_string = (
 )
 
 # =============================================================================
-# Clientside callbacks for buttons (Dash 4.0 way — no onClick props)
+# Clientside callbacks — Dash 4.0 way for button events
 # =============================================================================
 
-# Legend toggle
-clientside_callback(
-    "function(n) { if(n) grn_toggleLegend(); return n; }",
-    Output("legend-btn","n_clicks"),
-    Input("legend-btn","n_clicks"),
-    prevent_initial_call=True,
-)
-
-# Zoom out
-clientside_callback(
-    "function(n) { if(n) grn_zoomOut(); return n; }",
-    Output("zoom-out","n_clicks"),
-    Input("zoom-out","n_clicks"),
-    prevent_initial_call=True,
-)
-
-# Zoom fit
-clientside_callback(
-    "function(n) { if(n) grn_zoomFit(); return n; }",
-    Output("zoom-fit","n_clicks"),
-    Input("zoom-fit","n_clicks"),
-    prevent_initial_call=True,
-)
-
-# Zoom in
-clientside_callback(
-    "function(n) { if(n) grn_zoomIn(); return n; }",
-    Output("zoom-in","n_clicks"),
-    Input("zoom-in","n_clicks"),
-    prevent_initial_call=True,
-)
-
-# Save PNG
-clientside_callback(
-    "function(n) { if(n) grn_saveImage(); return n; }",
-    Output("save-btn","n_clicks"),
-    Input("save-btn","n_clicks"),
-    prevent_initial_call=True,
-)
+clientside_callback("function(n){if(n)grn_toggleLegend();return n;}",
+    Output("legend-btn","n_clicks"), Input("legend-btn","n_clicks"), prevent_initial_call=True)
+clientside_callback("function(n){if(n)grn_zoomOut();return n;}",
+    Output("zoom-out","n_clicks"), Input("zoom-out","n_clicks"), prevent_initial_call=True)
+clientside_callback("function(n){if(n)grn_zoomFit();return n;}",
+    Output("zoom-fit","n_clicks"), Input("zoom-fit","n_clicks"), prevent_initial_call=True)
+clientside_callback("function(n){if(n)grn_zoomIn();return n;}",
+    Output("zoom-in","n_clicks"), Input("zoom-in","n_clicks"), prevent_initial_call=True)
+clientside_callback("function(n){if(n)grn_saveImage();return n;}",
+    Output("save-btn","n_clicks"), Input("save-btn","n_clicks"), prevent_initial_call=True)
 
 # =============================================================================
-# Overlay builders
+# Overlays
 # =============================================================================
 
 def build_graph_overlays(theme="light"):
     t=THEMES[theme]; muted=t["muted"]; txt=t["text"]
-
     legend_panel = html.Div(id="legend-panel", children=[
         html.Div("Lens GRN Legend",style={"fontWeight":"bold","fontSize":"13px","color":WONG["sky_blue"],"marginBottom":"10px"}),
         html.Div("NODE — ROLE",style={"fontSize":"9px","fontWeight":"bold","color":muted,"textTransform":"uppercase","letterSpacing":"0.08em","marginBottom":"5px"}),
@@ -353,31 +390,23 @@ def build_graph_overlays(theme="light"):
         *[html.Div([html.Span("━▶",style={"color":c,"marginRight":"6px"}),l],style={"fontSize":"11px","marginBottom":"3px","color":txt})
           for c,l in [(WONG["green"],"Activating"),(WONG["vermillion"],"Inhibiting"),("#94a3b8","No effect")]],
         html.Br(),
-        html.Div("Yellow border = feedback loop node",style={"fontSize":"10px","color":muted}),
-        html.Div("Dashed = feedback loop edge",style={"fontSize":"10px","color":muted,"marginTop":"2px"}),
+        html.Div("Yellow border = feedback loop",style={"fontSize":"10px","color":muted}),
         html.Div("Hover = quick info  |  Click = full details",style={"fontSize":"10px","color":muted,"marginTop":"2px"}),
-        html.Div("Drag node → locks in place",style={"fontSize":"10px","color":muted,"marginTop":"2px"}),
+        html.Div("Drag node → locks; drag again to move",style={"fontSize":"10px","color":muted,"marginTop":"2px"}),
+        html.Div("Split view = different tissue networks",style={"fontSize":"10px","color":muted,"marginTop":"2px"}),
         html.Div("Wong (2011) color-blind safe",style={"fontSize":"10px","color":muted,"marginTop":"4px","fontStyle":"italic"}),
     ])
-
-    legend_btn = html.Div(id="legend-btn", n_clicks=0,
-        children=[html.Span("🔬 Legend "), html.Span("▲", id="legend-arrow")],
-        style={"cursor":"pointer"})
-
-    save_btn = html.Div(id="save-btn", n_clicks=0,
-        children=[html.Span("💾 Save PNG")],
-        style={"cursor":"pointer"})
-
-    zoom_box = html.Div(id="zoom-controls", children=[
-        html.Div("−", id="zoom-out", n_clicks=0, className="zoom-btn"),
+    legend_btn = html.Div(id="legend-btn",n_clicks=0,
+        children=[html.Span("🔬 Legend "),html.Span("▲",id="legend-arrow")])
+    save_btn   = html.Div(id="save-btn",n_clicks=0,children=[html.Span("💾 Save PNG")])
+    zoom_box   = html.Div(id="zoom-controls",children=[
+        html.Div("−",id="zoom-out",n_clicks=0,className="zoom-btn"),
         html.Div(className="zoom-sep"),
-        html.Div("⟳", id="zoom-fit", n_clicks=0, className="zoom-btn", style={"fontSize":"16px"}),
+        html.Div("⟳",id="zoom-fit",n_clicks=0,className="zoom-btn",style={"fontSize":"16px"}),
         html.Div(className="zoom-sep"),
-        html.Div("+", id="zoom-in",  n_clicks=0, className="zoom-btn"),
+        html.Div("+",id="zoom-in",n_clicks=0,className="zoom-btn"),
     ])
-
-    legend_overlay = html.Div(id="legend-overlay", children=[legend_panel, legend_btn])
-    return legend_overlay, save_btn, zoom_box
+    return html.Div(id="legend-overlay",children=[legend_panel,legend_btn]), save_btn, zoom_box
 
 # =============================================================================
 # Right panel builders
@@ -393,32 +422,28 @@ def empty_panel(theme="light"):
         html.Div("Hover for quick summary",style={"color":t["muted"],"fontSize":"11px","textAlign":"center","marginTop":"6px","fontStyle":"italic"}),
     ])
 
-
 def collapsible(sec_id,title,icon,body,open_default,theme):
     t=THEMES[theme]
-    arrow="▼" if open_default else "▶"
-    display="block" if open_default else "none"
     cls="sec-header sec-dark" if theme=="dark" else "sec-header sec-light"
     return html.Div([
         html.Div(id={"type":"sec-hdr","index":sec_id},className=cls,children=[
             html.Span([html.Span(icon+" "),html.Span(title,style={"fontWeight":"600","fontSize":"12px","color":t["text"]})]),
-            html.Span(arrow,id={"type":"sec-arr","index":sec_id},style={"color":t["muted"],"fontSize":"10px","marginLeft":"6px"}),
+            html.Span("▼" if open_default else "▶",id={"type":"sec-arr","index":sec_id},
+                      style={"color":t["muted"],"fontSize":"10px","marginLeft":"6px"}),
         ]),
-        html.Div(id={"type":"sec-body","index":sec_id},style={"display":display},children=body),
+        html.Div(id={"type":"sec-body","index":sec_id},
+                 style={"display":"block" if open_default else "none"},children=body),
     ],style={"marginBottom":"6px"})
 
-
 def data_table(rows, color_values, theme):
-    """Sort ascending (small → large) for numeric color-coded values."""
     t=THEMES[theme]
     if color_values:
-        def sort_key(item):
+        def sk(item):
             v=item[1]
             if v is None: return float('inf')
             try: return float(v)
             except: return float('inf')
-        rows=sorted(rows, key=sort_key)
-
+        rows=sorted(rows,key=sk)
     trs=[]
     for lbl,val in rows:
         if val is None: continue
@@ -442,8 +467,7 @@ def data_table(rows, color_values, theme):
         return html.Div("No values recorded.",style={"color":t["muted"],"fontSize":"11px","fontStyle":"italic","padding":"4px"})
     return html.Table(trs,style={"width":"100%","borderCollapse":"collapse","background":t["row_bg"],"borderRadius":"6px"})
 
-
-def node_panel(node_id,G,analysis,ext_data,theme="light"):
+def node_panel(node_id, G, analysis, ext_data, theme="light"):
     t=THEMES[theme]; d=G.nodes.get(node_id,{})
     is_reg=d.get("is_reg",False); is_tgt=d.get("is_tgt",False)
     out_d=d.get("out_degree",0); in_d=d.get("in_degree",0)
@@ -469,52 +493,76 @@ def node_panel(node_id,G,analysis,ext_data,theme="light"):
 
     sections=[collapsible("net_"+node_id,"Network Info","🔗",net_body,True,theme)]
 
-    for src_key,src_cfg in DATA_SOURCES.items():
-        lookup=ext_data.get(src_key,{}); gene_data=lookup.get(node_id)
-        icon=src_cfg.get("icon","📋"); lbl=src_cfg["label"]
+    # Build a combined data body — all sources in one collapsible
+    combined_children = []
+    has_any_data = False
+
+    for src_key, src_cfg in DATA_SOURCES.items():
+        lookup=ext_data.get(src_key,{})
+        gene_data=lookup.get(node_id)
         if gene_data is None:
-            body=html.Div("No "+lbl+" data for "+node_id+".",style={"color":t["muted"],"fontSize":"11px","fontStyle":"italic","padding":"6px 4px"})
-        else:
-            entrez=gene_data.get("_meta_entrez",""); uniprot=gene_data.get("_meta_uniprot",""); desc=gene_data.get("_meta_description","")
-            children=[]
-            links=[]
-            if entrez and entrez not in ("nan",""):
-                links.append(html.A("NCBI Gene ↗",href="https://www.ncbi.nlm.nih.gov/gene/"+str(entrez),target="_blank",style={"color":WONG["sky_blue"],"fontSize":"11px","marginRight":"10px","textDecoration":"underline"}))
-            if uniprot and uniprot not in ("nan",""):
-                links.append(html.A("UniProt ↗",href="https://www.uniprot.org/uniprot/"+str(uniprot),target="_blank",style={"color":WONG["sky_blue"],"fontSize":"11px","textDecoration":"underline"}))
-            if links: children.append(html.Div(links,style={"marginBottom":"6px","marginTop":"4px"}))
-            if desc and desc not in ("nan",""):
-                children.append(html.Div(str(desc)[:120]+("..." if len(str(desc))>120 else ""),style={"color":t["muted"],"fontSize":"10px","fontStyle":"italic","marginBottom":"8px"}))
-            for sec in src_cfg.get("sections",[]):
-                rows_data=[(dn,gene_data.get(dn)) for dn in sec["columns"]]
-                has_any=any(v is not None for _,v in rows_data)
-                color_vals=sec.get("color_values",True)
-                children.append(html.Div([
-                    html.Div(sec["title"],style={"fontSize":"10px","color":t["muted"],"fontWeight":"bold","textTransform":"uppercase","letterSpacing":"0.06em","marginTop":"10px","marginBottom":"2px"}),
-                    html.Div(sec.get("description",""),style={"fontSize":"10px","color":t["muted"],"marginBottom":"4px","fontStyle":"italic"}) if sec.get("description") else html.Div(),
-                    data_table(rows_data,color_vals,theme) if has_any else html.Div("No values.",style={"color":t["muted"],"fontSize":"11px","fontStyle":"italic","padding":"2px 4px"}),
-                ]))
-            if any(s.get("color_values") for s in src_cfg.get("sections",[])):
-                children.append(html.Div([
-                    html.Span("■ ",style={"color":WONG["green"]}),html.Span("Positive  ",style={"fontSize":"10px","color":t["muted"]}),
-                    html.Span("■ ",style={"color":WONG["vermillion"]}),html.Span("Negative",style={"fontSize":"10px","color":t["muted"]}),
-                ],style={"marginTop":"8px"}))
-            body=html.Div(children,style={"padding":"0 2px"})
-        sections.append(collapsible(src_key+"_"+node_id,lbl,icon,body,False,theme))
+            continue
+        has_any_data = True
+
+        # Links (only from first source that has them)
+        entrez=gene_data.get("_meta_entrez",""); uniprot=gene_data.get("_meta_uniprot","")
+        desc=gene_data.get("_meta_description","")
+        links=[]
+        if entrez and entrez not in ("nan",""):
+            links.append(html.A("NCBI Gene ↗",href="https://www.ncbi.nlm.nih.gov/gene/"+str(entrez),target="_blank",
+                style={"color":WONG["sky_blue"],"fontSize":"11px","marginRight":"10px","textDecoration":"underline"}))
+        if uniprot and uniprot not in ("nan",""):
+            links.append(html.A("UniProt ↗",href="https://www.uniprot.org/uniprot/"+str(uniprot),target="_blank",
+                style={"color":WONG["sky_blue"],"fontSize":"11px","textDecoration":"underline"}))
+        if links and not combined_children:
+            combined_children.append(html.Div(links,style={"marginBottom":"6px","marginTop":"4px"}))
+        if desc and desc not in ("nan","") and not combined_children:
+            combined_children.append(html.Div(str(desc)[:120]+("..." if len(str(desc))>120 else ""),
+                style={"color":t["muted"],"fontSize":"10px","fontStyle":"italic","marginBottom":"8px"}))
+
+        # Sections
+        for sec in src_cfg.get("sections",[]):
+            rows_data=[(dn,gene_data.get(dn)) for dn in sec["columns"]]
+            has_sec_data=any(v is not None for _,v in rows_data)
+            color_vals=sec.get("color_values",True)
+            combined_children.append(html.Div([
+                html.Div(sec["title"],style={"fontSize":"10px","color":t["muted"],"fontWeight":"bold",
+                                             "textTransform":"uppercase","letterSpacing":"0.06em",
+                                             "marginTop":"10px","marginBottom":"2px"}),
+                html.Div(sec.get("description",""),style={"fontSize":"10px","color":t["muted"],"marginBottom":"4px","fontStyle":"italic"})
+                if sec.get("description") else html.Div(),
+                data_table(rows_data,color_vals,theme) if has_sec_data else
+                html.Div("No values.",style={"color":t["muted"],"fontSize":"11px","fontStyle":"italic","padding":"2px 4px"}),
+            ]))
+
+    if combined_children:
+        # Color legend
+        combined_children.append(html.Div([
+            html.Span("■ ",style={"color":WONG["green"]}),html.Span("Positive  ",style={"fontSize":"10px","color":t["muted"]}),
+            html.Span("■ ",style={"color":WONG["vermillion"]}),html.Span("Negative",style={"fontSize":"10px","color":t["muted"]}),
+        ],style={"marginTop":"8px"}))
+        sections.append(collapsible("expr_"+node_id,"Expression & Enrichment","📊",
+                                    html.Div(combined_children,style={"padding":"0 2px"}),False,theme))
+    elif not has_any_data:
+        sections.append(collapsible("expr_"+node_id,"Expression & Enrichment","📊",
+            html.Div("No expression data available for "+node_id+".",
+                     style={"color":t["muted"],"fontSize":"11px","fontStyle":"italic","padding":"6px 4px"}),
+            False,theme))
 
     return html.Div([
         html.Div(node_id,style={"fontWeight":"bold","fontSize":"16px","color":WONG["sky_blue"],"fontFamily":"monospace","marginBottom":"12px"}),
         *sections,
     ])
 
-
 def edge_panel(edge_data,theme="light"):
     t=THEMES[theme]
-    src=edge_data.get("source",""); tgt=edge_data.get("target","")
-    rel=edge_data.get("rel","no_effect"); perts=edge_data.get("perts",[])
-    effs=edge_data.get("effs",[]); stgs=edge_data.get("stages",[])
-    count=edge_data.get("count",1); pmids=edge_data.get("pmids",[])
-    is_fb=edge_data.get("feedback",False)
+    # Support both original and tagged node IDs
+    src=edge_data.get("source_gene", edge_data.get("source",""))
+    tgt=edge_data.get("target_gene", edge_data.get("target",""))
+    rel=edge_data.get("rel","no_effect")
+    perts=edge_data.get("perts",[]); effs=edge_data.get("effs",[])
+    stgs=edge_data.get("stages",[]); count=edge_data.get("count",1)
+    pmids=edge_data.get("pmids",[]); is_fb=edge_data.get("feedback",False)
     t_reg=edge_data.get("tissue_reg",""); t_tgt=edge_data.get("tissue_tgt","")
     rc=WONG["green"] if rel=="activating" else (WONG["vermillion"] if rel=="inhibiting" else "#94a3b8")
     rlbl="▲ Activating" if rel=="activating" else ("▼ Inhibiting" if rel=="inhibiting" else "○ No effect")
@@ -530,11 +578,11 @@ def edge_panel(edge_data,theme="light"):
         row("Evidence count",str(count)),
         row("Tissue of regulator",t_reg or "—"),
         row("Tissue of target",t_tgt or "—"),
-    ]+([html.Div("⚡ Part of feedback loop",style={"color":WONG["orange"],"fontSize":"12px","marginTop":"4px"})] if is_fb else []),
+    ]+([html.Div("⚡ Feedback loop",style={"color":WONG["orange"],"fontSize":"12px","marginTop":"4px"})] if is_fb else []),
         style={"padding":"2px 4px"})
     pmid_links=[html.A("📄 PMID "+pmid+" ↗",href="https://pubmed.ncbi.nlm.nih.gov/"+pmid+"/",target="_blank",
-                       style={"color":WONG["sky_blue"],"display":"block","fontSize":"12px","marginBottom":"5px","textDecoration":"underline"})
-                for pmid in pmids]
+               style={"color":WONG["sky_blue"],"display":"block","fontSize":"12px","marginBottom":"5px","textDecoration":"underline"})
+               for pmid in pmids]
     pmid_body=html.Div(pmid_links or [html.Div("No PubMed IDs.",style={"color":t["muted"],"fontSize":"11px","fontStyle":"italic","padding":"4px"})],style={"padding":"2px 4px"})
     return html.Div([
         html.Div([
@@ -547,7 +595,7 @@ def edge_panel(edge_data,theme="light"):
     ])
 
 # =============================================================================
-# Sidebar + Layout
+# Sidebar
 # =============================================================================
 
 def build_sidebar(theme="light"):
@@ -562,10 +610,8 @@ def build_sidebar(theme="light"):
                "height":"100vh","boxSizing":"border-box"},
         children=[
             html.Div(style={"display":"flex","justifyContent":"space-between","alignItems":"center"},children=[
-                html.Div([
-                    html.Div("Lens GRN Explorer",style={"color":WONG["sky_blue"],"fontFamily":"monospace","fontWeight":"bold","fontSize":"13px"}),
-                    html.Div("Lachke Lab 2016",style={"color":t["muted"],"fontSize":"11px"}),
-                ]),
+                html.Div([html.Div("Lens GRN Explorer",style={"color":WONG["sky_blue"],"fontFamily":"monospace","fontWeight":"bold","fontSize":"13px"}),
+                          html.Div("Lachke Lab 2016",style={"color":t["muted"],"fontSize":"11px"})]),
                 html.Div(id="theme-toggle",n_clicks=0,
                     style={"cursor":"pointer","border":"1px solid "+t["sidebar_bdr"],"borderRadius":"6px","padding":"4px 8px","textAlign":"center","minWidth":"50px"},
                     children=[html.Div("🌙" if theme=="light" else "☀️",style={"fontSize":"14px"}),
@@ -594,6 +640,7 @@ def build_sidebar(theme="light"):
             html.Hr(style=hr),
             html.Div([
                 html.Label("Tissue Filter",style=label),
+                html.Div("Different tissues → split network view",style={"fontSize":"10px","color":WONG["sky_blue"],"fontFamily":"monospace","marginTop":"3px","marginBottom":"4px"}),
                 html.Label("Tissue of regulator",style=sub),
                 dcc.Dropdown(id="filter-tissue-reg",options=tissue_opts(ALL_TISSUE_REG),placeholder="All tissues",clearable=True,style={"fontSize":"12px"}),
                 html.Label("Tissue of target",style={**sub,"marginTop":"6px"}),
@@ -616,12 +663,9 @@ def build_sidebar(theme="light"):
                     value=300,clearable=False,style={"fontSize":"12px"}),
                 html.Label("Layout",style={**sub,"marginTop":"6px"}),
                 dcc.Dropdown(id="layout-select",options=[
-                    {"label":"Barnes Hut","value":"barnes_hut"},
-                    {"label":"Force Atlas 2","value":"force_atlas_2based"},
-                    {"label":"Repulsion","value":"repulsion"},
-                    {"label":"Circle","value":"circle"},
-                    {"label":"Grid","value":"grid"},
-                    {"label":"Dagre (hierarchy)","value":"dagre"},
+                    {"label":"Barnes Hut","value":"barnes_hut"},{"label":"Force Atlas 2","value":"force_atlas_2based"},
+                    {"label":"Repulsion","value":"repulsion"},{"label":"Circle","value":"circle"},
+                    {"label":"Grid","value":"grid"},{"label":"Dagre (hierarchy)","value":"dagre"},
                 ],value="barnes_hut",clearable=False,style={"fontSize":"12px"}),
             ]),
             html.Hr(style=hr),
@@ -643,6 +687,24 @@ def build_sidebar(theme="light"):
         ],
     )
 
+# =============================================================================
+# Build Layout — supports single or split graph view
+# =============================================================================
+
+def make_cytoscape(cy_id, theme, layout_cfg):
+    t=THEMES[theme]
+    return cyto.Cytoscape(
+        id=cy_id, elements=[], stylesheet=build_stylesheet(theme),
+        layout=layout_cfg,
+        style={"width":"100%","height":"calc(100vh - 46px)","background":t["bgcolor"]},
+        minZoom=0.05, maxZoom=3,
+        userZoomingEnabled=True, userPanningEnabled=True,
+        boxSelectionEnabled=False, autoungrabify=False, autolock=False,
+    )
+
+DEFAULT_LAYOUT = {"name":"cose","animate":True,"randomize":True,
+                  "idealEdgeLength":100,"nodeRepulsion":450000,
+                  "gravity":0.25,"numIter":1000,"fit":True,"padding":40}
 
 def build_layout(theme="light"):
     t=THEMES[theme]
@@ -650,6 +712,7 @@ def build_layout(theme="light"):
     return html.Div(id="app-container",
         style={"display":"flex","flexDirection":"column","height":"100vh","background":t["bgcolor"],"overflow":"hidden"},
         children=[
+            # Topbar
             html.Div(style={"background":t["topbar_bg"],"borderBottom":"1px solid "+t["topbar_bdr"],
                             "padding":"8px 20px","display":"flex","alignItems":"center","gap":"12px","flexShrink":"0"},
                 children=[
@@ -657,39 +720,48 @@ def build_layout(theme="light"):
                     html.Span("Gene Regulatory Network — Lachke Lab 2016",style={"color":t["muted"],"fontSize":"12px"}),
                     html.Div(id="topbar-stats",style={"marginLeft":"auto","fontFamily":"monospace","fontSize":"11px","color":t["muted"]}),
                 ]),
+            # Body
             html.Div(style={"display":"flex","flex":"1","overflow":"hidden"},children=[
                 build_sidebar(theme),
-                html.Div(style={"flex":"1","position":"relative","overflow":"hidden"},children=[
-                    dcc.Loading(id="loading-graph",type="circle",color=WONG["sky_blue"],children=[
-                        cyto.Cytoscape(
-                            id="cytoscape-graph",elements=[],stylesheet=build_stylesheet(theme),
-                            layout={"name":"cose","animate":True,"randomize":True,
-                                    "idealEdgeLength":100,"nodeRepulsion":450000,
-                                    "gravity":0.25,"numIter":1000,"fit":True,"padding":40},
-                            style={"width":"100%","height":"calc(100vh - 46px)","background":t["bgcolor"]},
-                            minZoom=0.05,maxZoom=3,userZoomingEnabled=True,
-                            userPanningEnabled=True,boxSelectionEnabled=False,
-                            autoungrabify=False,autolock=False,
-                        )
+                # Graph area — single or split (controlled by graph-mode store)
+                html.Div(id="graph-area",children=[
+                    # Pane 1 — always visible
+                    html.Div(id="graph-pane-1",className="graph-pane",children=[
+                        html.Div(id="pane1-label",className="graph-pane-label",style={"display":"none"}),
+                        dcc.Loading(id="loading-graph",type="circle",color=WONG["sky_blue"],children=[
+                            make_cytoscape("cytoscape-graph",theme,DEFAULT_LAYOUT)
+                        ]),
                     ]),
+                    # Divider — hidden in single mode
+                    html.Div(id="graph-divider",className="graph-divider",style={"display":"none"}),
+                    # Pane 2 — hidden in single mode
+                    html.Div(id="graph-pane-2",className="graph-pane",style={"display":"none"},children=[
+                        html.Div(id="pane2-label",className="graph-pane-label",style={"display":"none"}),
+                        dcc.Loading(id="loading-graph-2",type="circle",color=WONG["sky_blue"],children=[
+                            make_cytoscape("cytoscape-graph-2",theme,DEFAULT_LAYOUT)
+                        ]),
+                    ]),
+                    # Shared overlays
                     html.Div(id="hover-tooltip",style={
                         "background":"#ffffff" if theme=="light" else "#0f1525",
                         "border":"1px solid #e2e8f0" if theme=="light" else "1px solid #1e2d4a",
                         "color":"#0f172a" if theme=="light" else "#e2e8f0"}),
                     legend_overlay, save_btn, zoom_box,
                 ]),
+                # Right panel
                 html.Div(style={"width":"300px","minWidth":"300px","background":t["panel_bg"],
                                 "borderLeft":"1px solid "+t["panel_bdr"],"padding":"14px",
                                 "overflowY":"auto","height":"calc(100vh - 46px)","boxSizing":"border-box"},
                     children=[
-                        html.Div("Details",style={"fontSize":"10px","fontWeight":"bold","letterSpacing":"0.1em","color":t["muted"],"fontFamily":"monospace","textTransform":"uppercase","marginBottom":"10px"}),
+                        html.Div("Details",style={"fontSize":"10px","fontWeight":"bold","letterSpacing":"0.1em",
+                                                   "color":t["muted"],"fontFamily":"monospace","textTransform":"uppercase","marginBottom":"10px"}),
                         html.Div(id="info-panel",children=[empty_panel(theme)]),
                     ]),
             ]),
             dcc.Store(id="theme-store",data=theme),
             dcc.Store(id="graph-store",data={}),
+            dcc.Store(id="graph-store-2",data={}),
         ])
-
 
 app.layout = build_layout("light")
 
@@ -712,10 +784,37 @@ def update_theme(theme): return build_layout(theme).children
 )
 def reset(_): return None,None,None,None,None,None,None,["activating","inhibiting","no_effect"],300,"barnes_hut"
 
+def get_layout_cfg(layout):
+    layout_map={
+        "barnes_hut":        {"name":"cose","animate":True,"randomize":True,"idealEdgeLength":100,"nodeRepulsion":450000,"gravity":0.25,"numIter":1000,"fit":True,"padding":40},
+        "force_atlas_2based":{"name":"cose","animate":True,"randomize":True,"idealEdgeLength":70, "nodeRepulsion":650000,"gravity":0.1, "numIter":1500,"fit":True,"padding":40},
+        "repulsion":         {"name":"cose","animate":True,"randomize":True,"idealEdgeLength":160,"nodeRepulsion":900000,"gravity":0.05,"numIter":1000,"fit":True,"padding":50},
+        "circle":            {"name":"circle","animate":True,"fit":True,"padding":30},
+        "grid":              {"name":"grid",  "animate":True,"fit":True,"padding":30},
+        "dagre":             {"name":"dagre", "animate":True,"rankDir":"TB","fit":True,"padding":30},
+    }
+    return layout_map.get(layout or "barnes_hut", {"name":"cose","animate":True,"randomize":True,"fit":True,"padding":40})
+
 @app.callback(
-    Output("cytoscape-graph","elements"),Output("cytoscape-graph","stylesheet"),
-    Output("cytoscape-graph","layout"),Output("graph-store","data"),
-    Output("stats-panel","children"),Output("topbar-stats","children"),
+    # Graph 1
+    Output("cytoscape-graph","elements"),
+    Output("cytoscape-graph","stylesheet"),
+    Output("cytoscape-graph","layout"),
+    Output("graph-store","data"),
+    # Graph 2 (split view)
+    Output("cytoscape-graph-2","elements"),
+    Output("cytoscape-graph-2","layout"),
+    Output("graph-store-2","data"),
+    # Split view controls
+    Output("graph-pane-2","style"),
+    Output("graph-divider","style"),
+    Output("pane1-label","style"),
+    Output("pane1-label","children"),
+    Output("pane2-label","style"),
+    Output("pane2-label","children"),
+    # Stats
+    Output("stats-panel","children"),
+    Output("topbar-stats","children"),
     Input("apply-btn","n_clicks"),
     State("stage-single","value"),State("stage-from","value"),State("stage-to","value"),
     State("filter-regulator","value"),State("filter-target","value"),
@@ -735,45 +834,91 @@ def apply_filters(n,stage_single,stage_from,stage_to,filter_reg,filter_tgt,
                 "max_edges":int(max_edges) if max_edges!=9999 else None})
 
     df=filter_data(BASE_DF.copy(),cfg)
+    layout_cfg=get_layout_cfg(layout)
+    stylesheet=build_stylesheet(theme)
+    hide={"display":"none"}
+    show_flex={"display":"flex"}
+    show_block={"display":"block"}
+
     if len(df)==0:
-        return [],[],{"name":"cose","animate":True},{},_stats_empty(theme),""
+        empty_store={}
+        return [],[],layout_cfg,empty_store,[],layout_cfg,empty_store,\
+               hide,hide,hide,"",hide,"",_stats_empty(theme),""
 
-    G=build_graph(df); analysis=analyze_graph(G,cfg)
-    elements=build_cytoscape_elements(G,analysis,cfg,EXT_DATA)
+    # ── Determine if split view needed ───────────────────────────────────
+    # Split when both tissue filters are set AND they differ
+    do_split = (filter_t_reg and filter_t_tgt and filter_t_reg != filter_t_tgt)
 
-    g_store={
-        "nodes":{n:dict(G.nodes[n]) for n in G.nodes()},
-        "edges":{u+"|||"+v:{**dict(data),"stages":[str(s) for s in data.get("stages",[])]}
-                 for u,v,data in G.edges(data=True)},
-        "feedback_nodes":list(analysis.get("feedback_nodes",set())),
-        "feedback_edges":[list(e) for e in analysis.get("feedback_edges",set())],
-        "self_loops":[list(e) for e in analysis.get("self_loops",[])],
-        "hub_genes":analysis.get("hub_genes",[]),
-    }
+    if do_split:
+        # Build two separate filtered datasets — one per tissue combination
+        cfg1=copy.deepcopy(cfg)
+        cfg1["filter_tissue_reg"]=filter_t_reg
+        cfg1["filter_tissue_tgt"]=None   # regulator tissue only for pane 1
+        df1=filter_data(BASE_DF.copy(),cfg1)
 
-    layout_map={
-        "barnes_hut":        {"name":"cose","animate":True,"randomize":True,"idealEdgeLength":100,"nodeRepulsion":450000,"gravity":0.25,"numIter":1000,"fit":True,"padding":40},
-        "force_atlas_2based":{"name":"cose","animate":True,"randomize":True,"idealEdgeLength":70, "nodeRepulsion":650000,"gravity":0.1, "numIter":1500,"fit":True,"padding":40},
-        "repulsion":         {"name":"cose","animate":True,"randomize":True,"idealEdgeLength":160,"nodeRepulsion":900000,"gravity":0.05,"numIter":1000,"fit":True,"padding":50},
-        "circle":            {"name":"circle","animate":True,"fit":True,"padding":30},
-        "grid":              {"name":"grid",  "animate":True,"fit":True,"padding":30},
-        "dagre":             {"name":"dagre", "animate":True,"rankDir":"TB","fit":True,"padding":30},
-    }
-    layout_cfg=layout_map.get(layout or "barnes_hut",{"name":"cose","animate":True,"randomize":True,"fit":True,"padding":40})
-    return (elements,build_stylesheet(theme),layout_cfg,g_store,_stats_panel(G,analysis,theme),_topbar_stats(G,analysis))
+        cfg2=copy.deepcopy(cfg)
+        cfg2["filter_tissue_reg"]=None
+        cfg2["filter_tissue_tgt"]=filter_t_tgt  # target tissue only for pane 2
+        df2=filter_data(BASE_DF.copy(),cfg2)
+
+        G1=build_graph(df1); analysis1=analyze_graph(G1,cfg1)
+        G2=build_graph(df2); analysis2=analyze_graph(G2,cfg2)
+        el1=build_cytoscape_elements(G1,analysis1,cfg1,EXT_DATA,tissue_tag="")
+        el2=build_cytoscape_elements(G2,analysis2,cfg2,EXT_DATA,tissue_tag="__t2")
+
+        def make_store(G,analysis):
+            return {
+                "nodes":{n:dict(G.nodes[n]) for n in G.nodes()},
+                "edges":{u+"|||"+v:{**dict(data),"stages":[str(s) for s in data.get("stages",[])]}
+                         for u,v,data in G.edges(data=True)},
+                "feedback_nodes":list(analysis.get("feedback_nodes",set())),
+                "feedback_edges":[list(e) for e in analysis.get("feedback_edges",set())],
+                "self_loops":[list(e) for e in analysis.get("self_loops",[])],
+                "hub_genes":analysis.get("hub_genes",[]),
+            }
+
+        store1=make_store(G1,analysis1); store2=make_store(G2,analysis2)
+        label1=filter_t_reg+" (Regulator tissue)"
+        label2=filter_t_tgt+" (Target tissue)"
+        lbl_style={"display":"block"}
+
+        return (el1,stylesheet,layout_cfg,store1,
+                el2,layout_cfg,store2,
+                show_block,{"width":"3px","background":"#e2e8f0","flexShrink":"0"},
+                lbl_style,label1,lbl_style,label2,
+                _stats_panel(G1,analysis1,theme),
+                "Pane 1: "+_topbar_stats(G1,analysis1)+" | Pane 2: "+_topbar_stats(G2,analysis2))
+    else:
+        # Single view
+        G=build_graph(df); analysis=analyze_graph(G,cfg)
+        elements=build_cytoscape_elements(G,analysis,cfg,EXT_DATA)
+        g_store={
+            "nodes":{n:dict(G.nodes[n]) for n in G.nodes()},
+            "edges":{u+"|||"+v:{**dict(data),"stages":[str(s) for s in data.get("stages",[])]}
+                     for u,v,data in G.edges(data=True)},
+            "feedback_nodes":list(analysis.get("feedback_nodes",set())),
+            "feedback_edges":[list(e) for e in analysis.get("feedback_edges",set())],
+            "self_loops":[list(e) for e in analysis.get("self_loops",[])],
+            "hub_genes":analysis.get("hub_genes",[]),
+        }
+        return (elements,stylesheet,layout_cfg,g_store,
+                [],[],{},
+                hide,hide,hide,"",hide,"",
+                _stats_panel(G,analysis,theme),_topbar_stats(G,analysis))
 
 
 @app.callback(
     Output("hover-tooltip","children"),Output("hover-tooltip","style"),
     Input("cytoscape-graph","mouseoverNodeData"),Input("cytoscape-graph","mouseoverEdgeData"),
+    Input("cytoscape-graph-2","mouseoverNodeData"),Input("cytoscape-graph-2","mouseoverEdgeData"),
     Input("cytoscape-graph","tapNodeData"),Input("cytoscape-graph","tapEdgeData"),
+    Input("cytoscape-graph-2","tapNodeData"),Input("cytoscape-graph-2","tapEdgeData"),
     State("theme-store","data"),prevent_initial_call=True,
 )
-def update_hover(node_hover,edge_hover,node_tap,edge_tap,theme):
+def update_hover(nh1,eh1,nh2,eh2,nt1,et1,nt2,et2,theme):
     theme=theme or "light"; ctx=callback_context
     trigger=ctx.triggered[0]["prop_id"] if ctx.triggered else ""
-    if "tapNodeData" in trigger or "tapEdgeData" in trigger:
-        return "",{"display":"none"}
+    if any(x in trigger for x in ["tapNodeData","tapEdgeData"]): return "",{"display":"none"}
     base={"position":"fixed","zIndex":"99999","pointerEvents":"none","borderRadius":"10px",
           "padding":"10px 14px","fontFamily":"monospace","fontSize":"12px",
           "boxShadow":"0 4px 24px rgba(0,0,0,0.13)","maxWidth":"260px","minWidth":"160px",
@@ -782,11 +927,13 @@ def update_hover(node_hover,edge_hover,node_tap,edge_tap,theme):
           "border":"1px solid #e2e8f0" if theme=="light" else "1px solid #1e2d4a",
           "color":"#0f172a" if theme=="light" else "#e2e8f0"}
     muted="#64748b"; sky=WONG["sky_blue"]; org=WONG["orange"]
+    node_hover = nh1 or nh2
+    edge_hover = eh1 or eh2
     if "mouseoverNodeData" in trigger and node_hover:
         role_map={"regulator":"Regulator","target":"Target","both":"Regulator & Target","selfloop":"Self-regulatory"}
         role=role_map.get(node_hover.get("role","target"),"—")
         return [
-            html.Div(node_hover.get("id",""),style={"fontWeight":"bold","color":sky,"fontSize":"13px","marginBottom":"5px"}),
+            html.Div(node_hover.get("label",node_hover.get("id","")),style={"fontWeight":"bold","color":sky,"fontSize":"13px","marginBottom":"5px"}),
             html.Div("Role: "+role,style={"color":muted,"fontSize":"11px"}),
             html.Div("Out-edges: "+str(node_hover.get("out_deg",0)),style={"color":muted,"fontSize":"11px"}),
             html.Div("In-edges: "+str(node_hover.get("in_deg",0)),style={"color":muted,"fontSize":"11px"}),
@@ -795,13 +942,11 @@ def update_hover(node_hover,edge_hover,node_tap,edge_tap,theme):
     if "mouseoverEdgeData" in trigger and edge_hover:
         rel=edge_hover.get("rel","no_effect")
         rc=WONG["green"] if rel=="activating" else (WONG["vermillion"] if rel=="inhibiting" else muted)
+        src=edge_hover.get("source_gene",edge_hover.get("source",""))
+        tgt=edge_hover.get("target_gene",edge_hover.get("target",""))
         return [
-            html.Div([html.Span(edge_hover.get("source",""),style={"color":sky,"fontWeight":"bold"}),
-                      html.Span(" → ",style={"color":muted}),
-                      html.Span(edge_hover.get("target",""),style={"color":org,"fontWeight":"bold"})],
-                     style={"marginBottom":"5px","fontSize":"12px"}),
-            html.Div([html.Span("Relationship: ",style={"color":muted,"fontSize":"11px"}),
-                      html.Span(rel.capitalize(),style={"color":rc,"fontSize":"11px","fontWeight":"bold"})]),
+            html.Div([html.Span(src,style={"color":sky,"fontWeight":"bold"}),html.Span(" → ",style={"color":muted}),html.Span(tgt,style={"color":org,"fontWeight":"bold"})],style={"marginBottom":"5px","fontSize":"12px"}),
+            html.Div([html.Span("Relationship: ",style={"color":muted,"fontSize":"11px"}),html.Span(rel.capitalize(),style={"color":rc,"fontSize":"11px","fontWeight":"bold"})]),
             html.Div("Stage(s): "+", ".join(edge_hover.get("stages",[])[:3]),style={"color":muted,"fontSize":"11px","marginTop":"2px"}),
             html.Div("Evidence: "+str(edge_hover.get("count",1))+" record(s)",style={"color":muted,"fontSize":"11px"}),
             html.Div("Click for PubMed links →",style={"color":sky,"fontSize":"10px","marginTop":"5px","fontStyle":"italic"}),
@@ -812,23 +957,30 @@ def update_hover(node_hover,edge_hover,node_tap,edge_tap,theme):
 @app.callback(
     Output("info-panel","children"),
     Input("cytoscape-graph","tapNodeData"),Input("cytoscape-graph","tapEdgeData"),
-    State("graph-store","data"),State("theme-store","data"),prevent_initial_call=True,
+    Input("cytoscape-graph-2","tapNodeData"),Input("cytoscape-graph-2","tapEdgeData"),
+    State("graph-store","data"),State("graph-store-2","data"),
+    State("theme-store","data"),prevent_initial_call=True,
 )
-def on_click(node_data,edge_data,g_store,theme):
+def on_click(nd1,ed1,nd2,ed2,g_store,g_store2,theme):
     theme=theme or "light"; ctx=callback_context
     trigger=ctx.triggered[0]["prop_id"] if ctx.triggered else ""
-    if not g_store: return empty_panel(theme)
+    node_data = nd1 if "cytoscape-graph." in trigger else (nd2 if nd2 else None)
+    edge_data = ed1 if "cytoscape-graph." in trigger else (ed2 if ed2 else None)
+    store = g_store if "cytoscape-graph." in trigger else (g_store2 if g_store2 else g_store)
+    if not store: return empty_panel(theme)
+
     if "tapNodeData" in trigger and node_data:
-        node_id=node_data["id"]
+        # Use label (original gene name) not id (which may have tissue tag)
+        node_id = node_data.get("label", node_data.get("id",""))
         G=nx.DiGraph()
-        for nid,attrs in g_store.get("nodes",{}).items(): G.add_node(nid,**attrs)
-        for ek,attrs in g_store.get("edges",{}).items():
+        for nid,attrs in store.get("nodes",{}).items(): G.add_node(nid,**attrs)
+        for ek,attrs in store.get("edges",{}).items():
             parts=ek.split("|||")
             if len(parts)==2: G.add_edge(parts[0],parts[1],**attrs)
-        analysis={"feedback_nodes":set(g_store.get("feedback_nodes",[])),
-                  "feedback_edges":set(tuple(e) for e in g_store.get("feedback_edges",[])),
-                  "self_loops":[tuple(e) for e in g_store.get("self_loops",[])],
-                  "hub_genes":g_store.get("hub_genes",[])}
+        analysis={"feedback_nodes":set(store.get("feedback_nodes",[])),
+                  "feedback_edges":set(tuple(e) for e in store.get("feedback_edges",[])),
+                  "self_loops":[tuple(e) for e in store.get("self_loops",[])],
+                  "hub_genes":store.get("hub_genes",[])}
         return node_panel(node_id,G,analysis,EXT_DATA,theme)
     if "tapEdgeData" in trigger and edge_data: return edge_panel(edge_data,theme)
     return empty_panel(theme)
@@ -888,10 +1040,10 @@ def _stats_empty(theme="light"):
     return html.Div([html.Label("Network Stats",style=lbl),html.Div("Apply filters to see stats.",style={"color":t["muted"],"fontSize":"12px","marginTop":"4px"})])
 
 def _topbar_stats(G,analysis):
-    return ("Nodes: "+str(G.number_of_nodes())+"  |  Edges: "+str(G.number_of_edges())+"  |  Feedback loops: "+str(len(analysis.get("feedback_loops",[]))))
+    return "Nodes: "+str(G.number_of_nodes())+"  |  Edges: "+str(G.number_of_edges())+"  |  Feedback loops: "+str(len(analysis.get("feedback_loops",[])))
 
 if __name__ == "__main__":
-    print("\n"+"="*60+"\n  Lens GRN — Dash 4.0 + Cytoscape\n"+"="*60)
+    print("\n"+"="*60+"\n  Lens GRN — Dash 4.0\n"+"="*60)
     print("  http://127.0.0.1:8050\n")
     server=app.server
     app.run(debug=False,host="0.0.0.0",port=int(os.environ.get("PORT",8050)))
