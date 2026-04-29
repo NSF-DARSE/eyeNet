@@ -87,13 +87,14 @@ def load_data(config):
     df = df[["sno","regulator","target","perturbation","effect","stage",
              "context","tissue_reg","tissue_tgt","reference","pmid"]]
     df = df.dropna(subset=["regulator","target"])
-    for c in ["regulator","target","perturbation","effect","stage","context",
-              "tissue_reg","tissue_tgt"]:
+    for c in ["regulator","target","perturbation","effect","stage",
+              "context","tissue_reg","tissue_tgt"]:
         df[c] = df[c].astype(str).str.strip()
     df["effect"]       = df["effect"].replace({"nan":"o","none":"o","None":"o","0":"o"})
     df["perturbation"] = df["perturbation"].replace({"nan":"-","none":"-","None":"-"})
-    df["tissue_reg"]   = df["tissue_reg"].replace({"nan":"Unknown","fiber cells":"Fiber cells"})
-    df["tissue_tgt"]   = df["tissue_tgt"].replace({"nan":"Unknown","fiber cells":"Fiber cells"})
+    # Normalize tissue names
+    df["tissue_reg"] = df["tissue_reg"].replace({"nan":"Unknown","fiber cells":"Fiber cells"})
+    df["tissue_tgt"] = df["tissue_tgt"].replace({"nan":"Unknown","fiber cells":"Fiber cells"})
     def clean_pmid(v):
         try:
             if pd.notna(v): return str(int(float(v)))
@@ -111,49 +112,101 @@ def _compute_relationship(row):
     return "activating" if pert == effect else "inhibiting"
 
 def _find_file(path):
+    """Try the exact path first, then common variations."""
     if os.path.exists(path): return path
-    for p in [
-        path.replace(" ","_").replace("(","").replace(")",""),
-        path.replace("_"," "),
-    ]:
+    candidates = [
+        path.replace("_"," "),                                    # underscores -> spaces
+        path.replace(" ","_"),                                    # spaces -> underscores
+        path.replace(" ","_").replace("(","").replace(")",""),   # remove parens
+    ]
+    for p in candidates:
         if os.path.exists(p): return p
+    # Last resort: search the data directory by partial name match
+    folder = os.path.dirname(path)
+    basename = os.path.basename(path)
+    if os.path.exists(folder):
+        # Try case-insensitive partial match
+        needle = basename.lower().replace("_","").replace(" ","")
+        for f in os.listdir(folder):
+            if f.lower().replace("_","").replace(" ","") == needle:
+                found = os.path.join(folder, f)
+                print("[DATA] Resolved '" + basename + "' -> '" + f + "'")
+                return found
     return None
 
 def load_external_data(data_sources: dict) -> dict:
+    """
+    Returns: { source_key -> { gene_symbol -> { col_display_name -> value } } }
+    Supports 'extra_paths' to merge additional files into the same gene lookup.
+    """
     result = {}
     for key, src in data_sources.items():
+        # Collect all (path, symbol_col) pairs to load
+        path_list = []
         real_path = _find_file(src.get("path",""))
-        if not real_path:
+        if real_path:
+            path_list.append((real_path, src.get("symbol_col","Symbol")))
+        else:
             print("[WARN] Not found: " + src.get("path",""))
+
+        # Extra paths (e.g. second Excel file for same gene set)
+        for ep in src.get("extra_paths", []):
+            ep_path = _find_file(ep.get("path",""))
+            if ep_path:
+                path_list.append((ep_path, ep.get("symbol_col","Symbol")))
+            else:
+                print("[WARN] Extra path not found: " + ep.get("path",""))
+
+        if not path_list:
             result[key] = {}
             continue
-        print("[DATA] Loading " + src.get("label",key) + ": " + real_path)
+
+        print("[DATA] Loading " + src.get("label",key) + " (" + str(len(path_list)) + " file(s))")
+        lookup = {}
         try:
-            df = pd.read_excel(real_path)
-            sym_col = src.get("symbol_col","Symbol")
-            lookup  = {}
-            for _, row in df.iterrows():
-                sym = str(row.get(sym_col,"")).strip()
-                if not sym or sym == "nan": continue
-                gene_data = {}
-                for section in src.get("sections",[]):
-                    for display_name, excel_col in section.get("columns",{}).items():
-                        v = row.get(excel_col)
-                        try:
-                            gene_data[display_name] = round(float(v),1) if pd.notna(v) else None
-                        except:
-                            gene_data[display_name] = str(v) if pd.notna(v) else None
-                for meta_key, excel_col in src.get("meta_cols",{}).items():
-                    v = row.get(excel_col)
-                    gene_data["_meta_"+meta_key] = str(v) if (v is not None and pd.notna(v)) else ""
-                lookup[sym] = gene_data
+            for file_path, sym_col in path_list:
+                df = pd.read_excel(file_path)
+                if sym_col not in df.columns:
+                    print("[WARN] symbol_col '" + sym_col + "' not in " + file_path)
+                    print("       Available: " + str(list(df.columns[:8])))
+                    continue
+                print("[DATA]   -> " + file_path + " (" + str(len(df)) + " rows, sym_col='" + sym_col + "')")
+                # Confirm symbol col found
+                if sym_col in df.columns:
+                    sample = df[sym_col].dropna().head(3).tolist()
+                    print("[DATA]      sample symbols: " + str(sample))
+                else:
+                    print("[WARN]      sym_col '" + sym_col + "' NOT in columns: " + str(list(df.columns[:6])))
+                for _, row in df.iterrows():
+                    sym = str(row.get(sym_col,"")).strip()
+                    if not sym or sym == "nan": continue
+                    if sym not in lookup:
+                        lookup[sym] = {}
+                    gene_data = lookup[sym]
+                    # Extract all section columns from this file
+                    for section in src.get("sections",[]):
+                        for display_name, excel_col in section.get("columns",{}).items():
+                            if excel_col not in df.columns:
+                                continue  # column not in this file, skip
+                            v = row.get(excel_col)
+                            try:
+                                gene_data[display_name] = round(float(v),1) if pd.notna(v) else None
+                            except:
+                                gene_data[display_name] = str(v) if pd.notna(v) else None
+                    # Extract meta columns from this file
+                    for meta_key, excel_col in src.get("meta_cols",{}).items():
+                        if excel_col not in df.columns: continue
+                        if "_meta_"+meta_key not in gene_data or not gene_data["_meta_"+meta_key]:
+                            v = row.get(excel_col)
+                            gene_data["_meta_"+meta_key] = str(v) if (v is not None and pd.notna(v)) else ""
+
             result[key] = lookup
-            print("[DATA]   -> " + str(len(lookup)) + " genes")
+            print("[DATA]   Total genes: " + str(len(lookup)))
         except Exception as e:
             print("[WARN] Failed loading " + key + ": " + str(e))
             result[key] = {}
-    return result
 
+    return result
 def stage_numeric(stage):
     s = str(stage).strip()
     if s == "Adult": return 100000.0
@@ -241,7 +294,11 @@ def analyze_graph(G, config):
     results["components"] = list(nx.weakly_connected_components(G))
     return results
 
-def build_cytoscape_elements(G, analysis, config, ext_data):
+def build_cytoscape_elements(G, analysis, config, ext_data, tissue_tag=""):
+    """
+    tissue_tag: optional suffix added to node IDs to allow side-by-side graphs
+    with same gene names but different tissue contexts.
+    """
     elements       = []
     feedback_nodes = analysis.get("feedback_nodes", set())
     self_loop_nodes= set(e[0] for e in analysis.get("self_loops", []))
@@ -261,9 +318,10 @@ def build_cytoscape_elements(G, analysis, config, ext_data):
         classes = role_class
         if node in feedback_nodes: classes += " feedback"
 
+        node_id = node + tissue_tag
         elements.append({
             "data": {
-                "id":        node,
+                "id":        node_id,
                 "label":     node,
                 "role":      role_class,
                 "deg":       deg,
@@ -285,18 +343,21 @@ def build_cytoscape_elements(G, analysis, config, ext_data):
 
         elements.append({
             "data": {
-                "id":       u + "__" + v,
-                "source":   u,
-                "target":   v,
-                "rel":      dom,
-                "perts":    sorted(set(data.get("perturbations",[]))),
-                "effs":     sorted(set(data.get("effects",[]))),
-                "stages":   sorted(set(str(s) for s in data.get("stages",[]) if pd.notna(s)))[:6],
-                "count":    count,
-                "pmids":    pmids[:8],
-                "feedback": is_fb,
+                "id":         u + tissue_tag + "__" + v + tissue_tag,
+                "source":     u + tissue_tag,
+                "target":     v + tissue_tag,
+                "rel":        dom,
+                "perts":      sorted(set(data.get("perturbations",[]))),
+                "effs":       sorted(set(data.get("effects",[]))),
+                "stages":     sorted(set(str(s) for s in data.get("stages",[]) if pd.notna(s)))[:6],
+                "count":      count,
+                "pmids":      pmids[:8],
+                "feedback":   is_fb,
                 "tissue_reg": data.get("tissue_reg",""),
                 "tissue_tgt": data.get("tissue_tgt",""),
+                # Store original gene names for panel lookup
+                "source_gene": u,
+                "target_gene": v,
             },
             "classes": classes,
         })
