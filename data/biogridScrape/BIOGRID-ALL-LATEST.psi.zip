@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="description" content="BioGRID Download Files and Resources">
+	<meta name="keywords" content="bioinformatics, biogrid, downloads, interactions, screens, protein, database">
+	<meta name="author" content="Mike Tyers (TyersLab.com)">
+	<meta name="copyright" content="Copyright &copy; 2026, Mike Tyers (TyersLab.com), All Rights Reserved.">
+	<meta name="application-name" content="BioLIMS">
+	<meta name="robots" content="INDEX,FOLLOW">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<base href="https://downloads.thebiogrid.org/">
+	
+	<link rel="apple-touch-icon" sizes="57x57" href="https://downloads.thebiogrid.org/img/favicons/apple-icon-57x57.png">
+	<link rel="apple-touch-icon" sizes="60x60" href="https://downloads.thebiogrid.org/img/favicons/apple-icon-60x60.png">
+	<link rel="apple-touch-icon" sizes="72x72" href="https://downloads.thebiogrid.org/img/favicons/apple-icon-72x72.png">
+	<link rel="apple-touch-icon" sizes="76x76" href="https://downloads.thebiogrid.org/img/favicons/apple-icon-76x76.png">
+	<link rel="apple-touch-icon" sizes="114x114" href="https://downloads.thebiogrid.org/img/favicons/apple-icon-114x114.png">
+	<link rel="apple-touch-icon" sizes="120x120" href="https://downloads.thebiogrid.org/img/favicons/apple-icon-120x120.png">
+	<link rel="apple-touch-icon" sizes="144x144" href="https://downloads.thebiogrid.org/img/favicons/apple-icon-144x144.png">
+	<link rel="apple-touch-icon" sizes="152x152" href="https://downloads.thebiogrid.org/img/favicons/apple-icon-152x152.png">
+	<link rel="apple-touch-icon" sizes="180x180" href="https://downloads.thebiogrid.org/img/favicons/apple-icon-180x180.png">
+	<link rel="icon" type="image/png" sizes="192x192"  href="https://downloads.thebiogrid.org/img/favicons/android-icon-192x192.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="https://downloads.thebiogrid.org/img/favicons/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="96x96" href="https://downloads.thebiogrid.org/img/favicons/favicon-96x96.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="https://downloads.thebiogrid.org/img/favicons/favicon-16x16.png">
+	<meta name="msapplication-TileColor" content="#ffffff">
+	<meta name="msapplication-TileImage" content="https://downloads.thebiogrid.org/img/favicons/ms-icon-144x144.png">
+	<meta name="theme-color" content="#ffffff">
+	
+	<link rel='canonical' href='https://downloads.thebiogrid.org' />
+	
+	<!-- IMS Stylesheets -->
+	<link rel="stylesheet" type="text/css" href="https://downloads.thebiogrid.org/css/font-awesome.min.css?1.0" />
+
+			<link rel="stylesheet" type="text/css" href="https://downloads.thebiogrid.org/css/jquery.qtip.min.css?1.0" />
+		
+	<link rel="stylesheet" type="text/css" href="https://downloads.thebiogrid.org/css/styles.min.css?1.0" />
+	
+	<title>BioGRID Download File Repository | BioGRID Downloads</title>
+	
+	
+	
+</head>
+<body>
+<div id='main'>
+	<div id='mainContent'><div class='biolimsNav'>
+	<div class="container-fluid">
+<nav class="navbar navbar-dark bg-dark navbar-expand-lg" role="navigation">
+<a class="navbar-brand" title="BioGRID Download File Repository (BioGRID Downloads)" href="https://downloads.thebiogrid.org"> <strong>BioGRID Downloads</strong></a>
+<button type="button" class="navbar-toggler" data-toggle="collapse" data-target="#navbarContent">
+<span class="sr-only">Toggle navigation</span><i class="fa fa-fw fa-lg fa-bars"></i></button>
+<div class="collapse navbar-collapse" id="navbarContent">
+<ul class="nav navbar-nav ml-auto">
+<li class='active  nav-item'><a class='nav-link' href='https://downloads.thebiogrid.org' title='Return to Homepage'>Home</a></li>
+<li class=' nav-item'><a class='nav-link' href='https://thebiogrid.org' title='The BioGRID'>BioGRID</a></li>
+<li class=' nav-item'><a class='nav-link' href='https://orcs.thebiogrid.org' title='BioGRID ORCS - An open repository of CRISPR screens'>BioGRID ORCS</a></li>
+<li class='hidden-sm nav-item'><a class='nav-link' href='https://twitter.com/biogrid' title='Follow Us on Twitter'><i class='fa fa-lg navbarIcon nav-item fa-twitter-square twitterIcon'></i></a></li>
+</ul>
+</div></nav></div>
+</div><div class='container-fluid'>
+	<section id='bodyWrap'>
+		<div class='container-fluid'>
+			<section class='row'>
+				<div class='col-lg-12'>
+					<div class='float-right'><i class='fa fa-3x fa-cloud-download blueIcon'></i></div>
+					<h2 class='marginBotSm'><strong>Welcome to the BioGRID Download File Repository</strong></h2>
+					<hr />
+					<p class='marginTopSm'>
+						Please use the file navigator below to browse and download archived BioGRID project files. All data provided are 100% freely available to both academic and commercial users under the <strong><a href='https://biogrid-downloads.nyc3.digitaloceanspaces.com/LICENSE.txt' target='_BLANK' title='BioGRID MIT License'>MIT License</a></strong>, and are provided <strong><span class='text-danger'>WITHOUT ANY WARRANTY</a></strong>. If you have any questions, please feel free to <strong><a href="/cdn-cgi/l/email-protection#34474144445b464074405c51565d5b53465d501a5b4653">contact us</a></strong>. 
+
+						Publications are requested to please cite the original contributing authors (where applicable) and also: <br /> <strong><a href='http://www.ncbi.nlm.nih.gov/pubmed/16381927' target='_BLANK' title='Stark C, Breitkreutz BJ, Reguly T, Boucher L, Breitkreutz A, Tyers M. Biogrid: A General Repository for Interaction Datasets. Nucleic Acids Res. Jan 1, 2006; 34:D535-9'>Stark C, Breitkreutz BJ, Reguly T, Boucher L, Breitkreutz A, Tyers M. Biogrid: A General Repository for Interaction Datasets. Nucleic Acids Res. Jan 1, 2006; 34:D535-9</a></strong>.
+					</p>
+					<hr />
+				</div>
+			</section>
+			
+			<section class='row'>
+				<div class='col-lg-12'>
+					<nav aria-label="breadcrumb" role="navigation">
+					  <ol class="breadcrumb">
+						<li class="breadcrumb-item"><a href="https://downloads.thebiogrid.org">Home</a></li>
+											  </ol>
+					</nav>
+				</div>
+				<div class='col-lg-8'>
+					<table class="table table-sm table-striped">
+						<thead class='thead-secondary'>
+							<tr>
+								<th scope="col">Name</th>
+							</tr>
+						</thead>
+						<tbody>
+																						<tr>
+									<td scope="row">
+																					<i class='fa fa-lg fa-folder lightBlueIcon'></i>
+											<a href='https://downloads.thebiogrid.org/BioGRID/' title='View Contents of this Directory'>BioGRID</a>
+																			</td>
+								</tr>
+															<tr>
+									<td scope="row">
+																					<i class='fa fa-lg fa-folder lightBlueIcon'></i>
+											<a href='https://downloads.thebiogrid.org/BioGRID-ORCS/' title='View Contents of this Directory'>BioGRID-ORCS</a>
+																			</td>
+								</tr>
+															<tr>
+									<td scope="row">
+																																	<i class='fa fa-lg fa-file-text-o fileIcon'></i>
+																						<div class='float-right'>
+                                                <a href='https://downloads.thebiogrid.org/Download/LICENSE.txt' title='Download LICENSE.txt' onclick="gtag( 'event', 'Download', { 'event_action' : 'File', 'event_label' : 'LICENSE.txt', 'value' : '1094' });"><i class='fa fa-lg fa-cloud-download downloadIcon'></i></a>
+                                                0.01 MB
+                                            </div>
+											<a href='https://downloads.thebiogrid.org/File/LICENSE.txt' title='Download LICENSE.txt' >LICENSE.txt</a>
+											
+																						
+																			</td>
+								</tr>
+													</tbody>
+					</table>
+				</div>
+				<div class='col-lg-4 paddingLeftNone' id='manifestDesc'>
+					<div class='card'>
+						<div class='card-body'>
+							
+		
+			<h2>BioGRID Download File Repository</h2> <p>The following directories contain datasets and tools available for download from our various websites.</p> <ul> <li><strong>BioGRID</strong>: Downloads related to the main BioGRID website (<a href='https://thebiogrid.org' title='The BioGRID'>thebiogrid.org</a>)</li> <li><strong>BioGRID-ORCS</strong>: Downloads related to the BioGRID Open Repository for CRISPR Screens (<a href='https://orcs.thebiogrid.org' title='BioGRID ORCS'>orcs.thebiogrid.org</a>)</li></ul> <p>All files are released under the MIT License and are provided <strong>WITHOUT ANY WARRANTY.</strong></p>
+		
+	
+						</div>
+					</div>
+				</div>
+			</section>
+		</div>
+	</section>
+</div>
+</div> <!-- Main Content -->
+
+<div class='container-fluid'>
+	<footer id="footer" class="hidden-print secondaryContent ">
+		<section class="container-fluid footerText">
+			<div class='pull-right'>
+				A <a href='https://thebiogrid.org' title='The BioGRID'>BioGRID</a> Project
+			</div>
+			Copyright &copy; 2026 | <a href='http://www.tyerslab.com' target='_BLANK' title='TyersLab.com'>TyersLab.com</a> | All Rights Reserved 
+		</section>
+	</footer>
+
+	<div id="footer-links" class='text-center'>
+		<a href="https://wiki.thebiogrid.org/doku.php/terms_and_conditions" title="BioGRID Terms and Conditions">Terms and Conditions</a> | 
+		<a href="https://wiki.thebiogrid.org/doku.php/privacy_policy" title="BioGRID Privacy Policy">Privacy Policy</a> | 
+        <a target="_blank" href="https://thebiogrid.org" title="BioGRID">BioGRID</a> |
+        <a target="_blank" href="https://orcs.thebiogrid.org" title="BioGRID CRISPR Database">CRISPR Database</a> |
+		<a target="_blank" href="https://osprey.thebiogrid.org" title="Osprey">Osprey</a> |
+		<a target="_blank" href="https://yeastkinome.org" title="Yeast Kinome">Yeast Kinome</a> |
+		<a target="_blank" href="http://www.tyerslab.com" title="Mike Tyers Lab Webpage">TyersLab.com</a> |
+		<a target="_blank" href="http://www.yeastgenome.org" title="Saccharomyces Genome Database">SGD</a> |
+		<a target="_blank" href="https://github.com/BioGRID" title="BioGRID GitHub">GitHub</a> | 
+		<a target="_blank" href="https://www.youtube.com/user/TheBioGRID" title="BioGRID YouTube">YouTube</a> |
+		<a target="_blank" href="https://twitter.com/biogrid" title="BioGRID Twitter">Twitter</a>
+	</div>
+
+	</div>
+</div>
+
+<!-- IMS Scripts -->
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="text/javascript" src="https://downloads.thebiogrid.org/js/jquery.min.js?1.0"></script>
+<script src="https://getbootstrap.com/assets/js/vendor/popper.min.js"></script>
+<script type="text/javascript" src="https://downloads.thebiogrid.org/js/bootstrap.min.js?1.0"></script>
+<script type="text/javascript" src="https://downloads.thebiogrid.org/js/core.js?1.0"></script>
+	<script type="text/javascript" src="https://downloads.thebiogrid.org/js/jquery.qtip.min.js?1.0"></script>
+<!-- /IMS Scripts -->
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-239330-2"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-239330-2');
+</script>
+
+
+</body>
+</html>
