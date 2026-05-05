@@ -145,7 +145,7 @@ def load_external_data(data_sources: dict) -> dict:
         path_list = []
         real_path = _find_file(src.get("path",""))
         if real_path:
-            path_list.append((real_path, src.get("symbol_col","Symbol")))
+            path_list.append((real_path, src.get("symbol_col","Symbol"), 0))
         else:
             print("[WARN] Not found: " + src.get("path",""))
 
@@ -153,7 +153,8 @@ def load_external_data(data_sources: dict) -> dict:
         for ep in src.get("extra_paths", []):
             ep_path = _find_file(ep.get("path",""))
             if ep_path:
-                path_list.append((ep_path, ep.get("symbol_col","Symbol")))
+                sheet = ep.get("sheet_name", 0)
+                path_list.append((ep_path, ep.get("symbol_col","Symbol"), sheet))
             else:
                 print("[WARN] Extra path not found: " + ep.get("path",""))
 
@@ -164,8 +165,10 @@ def load_external_data(data_sources: dict) -> dict:
         print("[DATA] Loading " + src.get("label",key) + " (" + str(len(path_list)) + " file(s))")
         lookup = {}
         try:
-            for file_path, sym_col in path_list:
-                df = pd.read_excel(file_path)
+            for item in path_list:
+                file_path, sym_col = item[0], item[1]
+                sheet = item[2] if len(item) > 2 else 0
+                df = pd.read_excel(file_path, sheet_name=sheet)
                 if sym_col not in df.columns:
                     print("[WARN] symbol_col '" + sym_col + "' not in " + file_path)
                     print("       Available: " + str(list(df.columns[:8])))

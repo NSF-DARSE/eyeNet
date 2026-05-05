@@ -34,21 +34,22 @@ DATA_SOURCES = {
     "all_expression": {
         "label":      "Expression & Enrichment",
         "icon":       "📊",
-        # Primary file — microarray expression + enrichment + RNA-seq enrichment
+        # Primary file — microarray raw counts + RNA-seq enrichment
         "path":       "data/MegaTable April 24 2024 for Microarray and RNA Seq Sent to Murali (1).xls",
         "symbol_col": "Symbol",
         "meta_cols":  {"entrez":"Entrez","uniprot":"UNIPROT","description":"Gene_description"},
-        # Secondary file — RNA-seq LogCPM expression values
+        # FPKM values from sheet 3 of the FPKM file
         "extra_paths": [
             {
                 "path":       "data/LogCPM_FPKM_TPM_FiberEpi120225 USE THIS FEB 13 2025.xls",
                 "symbol_col": "Symbol",
+                "sheet_name": "FPKM",
             }
         ],
         "sections": [
             {
                 "title":        "Microarray Expression (raw counts)",
-                "description":  "Raw expression counts. Epi first, then Fiber.",
+                "description":  "Raw expression counts. Epi then Fiber per stage.",
                 "color_values": False,
                 "columns": {
                     "Epi E12 (Beebe)":   "Beebe_E12_exp_Epi",
@@ -58,14 +59,18 @@ DATA_SOURCES = {
                 },
             },
             {
-                "title":        "Microarray Enrichment (log2 FC)",
-                "description":  "log2 fold change. Positive = enriched. Epi first, then Fiber.",
-                "color_values": True,
+                "title":        "RNA-seq Expression (FPKM) — Epi then Fiber per stage",
+                "description":  "FPKM expression values. Epi then Fiber, stage ascending.",
+                "color_values": False,
                 "columns": {
-                    "Epi E12":   "Beebe_E12_Epi_enr",
-                    "Fiber E12": "Beebe_E12_Fiber_enr",
-                    "Epi P13":   "Naka_P13_epi_enr",
-                    "Fiber P13": "Naka_P13_fiber_enr",
+                    "Epi P0b":   "P0b_FPKM_Epi",   "Fiber P0b": "P0b_FPKM_Fiber",
+                    "Epi E14":   "E14_FPKM_Epi",    "Fiber E14": "E14_FPKM_Fiber",
+                    "Epi E16":   "E16_FPKM_Epi",    "Fiber E16": "E16_FPKM_Fiber",
+                    "Epi E18":   "E18_FPKM_Epi",    "Fiber E18": "E18_FPKM_Fiber",
+                    "Epi P0":    "P0_FPKM_Epi",     "Fiber P0":  "P0_FPKM_Fiber",
+                    "Epi 3Mo":   "3Mo_FPKM_Epi",    "Fiber 3Mo": "3Mo_FPKM_Fiber",
+                    "Epi 6Mo":   "6Mo_FPKM_Epi",    "Fiber 6Mo": "6Mo_FPKM_Fiber",
+                    "Epi 2Y":    "2Y_FPKM_Epi",     "Fiber 2Y":  "2Y_FPKM_Fiber",
                 },
             },
             {
@@ -77,25 +82,10 @@ DATA_SOURCES = {
                     "LEC E16": "enr_LEC_E16_Cv", "FC E16": "enr_FC_E16_Cv",
                     "LEC E18": "enr_LEC_E18_Cv", "FC E18": "enr_FC_E18_Cv",
                     "LEC P0":  "enr_LEC_P0_Cv",  "FC P0":  "enr_FC_P0_Cv",
-                    "LEC P0R": "enr_LEC_P0_Rob", "FC P0R": "enr_FC_P0_Rob",
+                    "LEC P0b": "enr_LEC_P0_Rob", "FC P0b": "enr_FC_P0_Rob",
                     "LEC 3Mo": "enr_LEC_3Mo",    "FC 3Mo": "enr_FC_3Mo",
                     "LEC 6Mo": "enr_LEC_6Mo",    "FC 6Mo": "enr_FC_6Mo",
                     "LEC 2Y":  "enr_LEC_2Y",     "FC 2Y":  "enr_FC_2Y",
-                },
-            },
-            {
-                "title":        "RNA-seq Expression (LogCPM) — Epi then Fiber",
-                "description":  "Log CPM expression values. Epi first, Fiber second, ascending stage.",
-                "color_values": False,
-                "columns": {
-                    "Epi P0b":   "P0b_LogCPM_Epi",  "Fiber P0b": "P0b_LogCPM_Fiber",
-                    "Epi E14":   "E14_LogCPM_Epi",   "Fiber E14": "E14_LogCPM_Fiber",
-                    "Epi E16":   "E16_LogCPM_Epi",   "Fiber E16": "E16_LogCPM_Fiber",
-                    "Epi E18":   "E18_LogCPM_Epi",   "Fiber E18": "E18_LogCPM_Fiber",
-                    "Epi P0":    "P0_LogCPM_Epi",    "Fiber P0":  "P0_LogCPM_Fiber",
-                    "Epi 3Mo":   "3Mo_LogCPM_Epi",   "Fiber 3Mo": "3Mo_LogCPM_Fiber",
-                    "Epi 6Mo":   "6Mo_LogCPM_Epi",   "Fiber 6Mo": "6Mo_LogCPM_Fiber",
-                    "Epi 2Y":    "2Y_LogCPM_Epi",    "Fiber 2Y":  "2Y_LogCPM_Fiber",
                 },
             },
         ],
@@ -373,6 +363,7 @@ clientside_callback("function(n){if(n)grn_zoomIn();return n;}",
 clientside_callback("function(n){if(n)grn_saveImage();return n;}",
     Output("save-btn","n_clicks"), Input("save-btn","n_clicks"), prevent_initial_call=True)
 
+
 # =============================================================================
 # Overlays
 # =============================================================================
@@ -436,14 +427,9 @@ def collapsible(sec_id,title,icon,body,open_default,theme):
     ],style={"marginBottom":"6px"})
 
 def data_table(rows, color_values, theme):
+    """Display rows in original column order (Epi before Fiber as defined in DATA_SOURCES)."""
     t=THEMES[theme]
-    if color_values:
-        def sk(item):
-            v=item[1]
-            if v is None: return float('inf')
-            try: return float(v)
-            except: return float('inf')
-        rows=sorted(rows,key=sk)
+    # NO sorting — preserve the Epi-first, Fiber-second order from DATA_SOURCES columns dict
     trs=[]
     for lbl,val in rows:
         if val is None: continue
@@ -640,11 +626,35 @@ def build_sidebar(theme="light"):
             html.Hr(style=hr),
             html.Div([
                 html.Label("Tissue Filter",style=label),
-                html.Div("Different tissues → split network view",style={"fontSize":"10px","color":WONG["sky_blue"],"fontFamily":"monospace","marginTop":"3px","marginBottom":"4px"}),
+                html.Div("Auto-splits into two networks if different tissues exist in data",
+                         style={"fontSize":"10px","color":WONG["sky_blue"],"fontFamily":"monospace",
+                                "marginTop":"3px","marginBottom":"6px"}),
                 html.Label("Tissue of regulator",style=sub),
-                dcc.Dropdown(id="filter-tissue-reg",options=tissue_opts(ALL_TISSUE_REG),placeholder="All tissues",clearable=True,style={"fontSize":"12px"}),
+                html.Div([
+                    dcc.Dropdown(id="filter-tissue-reg",options=tissue_opts(ALL_TISSUE_REG),
+                                 placeholder="All tissues",clearable=True,style={"flex":"1","fontSize":"12px"}),
+                    html.Button("All",id="tissue-reg-all",n_clicks=0,
+                        style={"padding":"2px 7px","fontSize":"10px","cursor":"pointer","marginLeft":"4px",
+                               "border":"1px solid #cbd5e1","borderRadius":"4px","background":"#f1f5f9",
+                               "color":"#64748b","whiteSpace":"nowrap","height":"36px"}),
+                    html.Button("✕",id="tissue-reg-clear",n_clicks=0,
+                        style={"padding":"2px 7px","fontSize":"10px","cursor":"pointer","marginLeft":"2px",
+                               "border":"1px solid #cbd5e1","borderRadius":"4px","background":"#f1f5f9",
+                               "color":"#64748b","height":"36px"}),
+                ],style={"display":"flex","alignItems":"center"}),
                 html.Label("Tissue of target",style={**sub,"marginTop":"6px"}),
-                dcc.Dropdown(id="filter-tissue-tgt",options=tissue_opts(ALL_TISSUE_TGT),placeholder="All tissues",clearable=True,style={"fontSize":"12px"}),
+                html.Div([
+                    dcc.Dropdown(id="filter-tissue-tgt",options=tissue_opts(ALL_TISSUE_TGT),
+                                 placeholder="All tissues",clearable=True,style={"flex":"1","fontSize":"12px"}),
+                    html.Button("All",id="tissue-tgt-all",n_clicks=0,
+                        style={"padding":"2px 7px","fontSize":"10px","cursor":"pointer","marginLeft":"4px",
+                               "border":"1px solid #cbd5e1","borderRadius":"4px","background":"#f1f5f9",
+                               "color":"#64748b","whiteSpace":"nowrap","height":"36px"}),
+                    html.Button("✕",id="tissue-tgt-clear",n_clicks=0,
+                        style={"padding":"2px 7px","fontSize":"10px","cursor":"pointer","marginLeft":"2px",
+                               "border":"1px solid #cbd5e1","borderRadius":"4px","background":"#f1f5f9",
+                               "color":"#64748b","height":"36px"}),
+                ],style={"display":"flex","alignItems":"center"}),
             ]),
             html.Hr(style=hr),
             html.Div([
@@ -780,9 +790,26 @@ def update_theme(theme): return build_layout(theme).children
     Output("filter-regulator","value"),Output("filter-target","value"),
     Output("filter-tissue-reg","value"),Output("filter-tissue-tgt","value"),
     Output("relationship-filter","value"),Output("max-edges","value"),Output("layout-select","value"),
-    Input("reset-btn","n_clicks"),prevent_initial_call=True,
+    Input("reset-btn","n_clicks"),
+    Input("tissue-reg-all","n_clicks"),Input("tissue-reg-clear","n_clicks"),
+    Input("tissue-tgt-all","n_clicks"),Input("tissue-tgt-clear","n_clicks"),
+    prevent_initial_call=True,
 )
-def reset(_): return None,None,None,None,None,None,None,["activating","inhibiting","no_effect"],300,"barnes_hut"
+def reset(n_reset, n_reg_all, n_reg_clear, n_tgt_all, n_tgt_clear):
+    from dash import no_update
+    ctx = callback_context
+    trigger = ctx.triggered[0]["prop_id"] if ctx.triggered else ""
+    # Tissue regulator buttons — only clear tissue reg dropdown
+    if "tissue-reg-all" in trigger or "tissue-reg-clear" in trigger:
+        return (no_update,no_update,no_update,no_update,no_update,
+                None,no_update,no_update,no_update,no_update)
+    # Tissue target buttons — only clear tissue tgt dropdown
+    if "tissue-tgt-all" in trigger or "tissue-tgt-clear" in trigger:
+        return (no_update,no_update,no_update,no_update,no_update,
+                no_update,None,no_update,no_update,no_update)
+    # Full reset
+    return None,None,None,None,None,None,None,["activating","inhibiting","no_effect"],300,"barnes_hut"
+
 
 def get_layout_cfg(layout):
     layout_map={
@@ -845,21 +872,59 @@ def apply_filters(n,stage_single,stage_from,stage_to,filter_reg,filter_tgt,
         return [],[],layout_cfg,empty_store,[],layout_cfg,empty_store,\
                hide,hide,hide,"",hide,"",_stats_empty(theme),""
 
-    # ── Determine if split view needed ───────────────────────────────────
-    # Split when both tissue filters are set AND they differ
-    do_split = (filter_t_reg and filter_t_tgt and filter_t_reg != filter_t_tgt)
+    # ── Auto-split: check if filtered data has multiple distinct tissue groups ──
+    # Get unique regulator tissues and target tissues in this filtered dataset
+    unique_t_reg = set(df["tissue_reg"].dropna().unique()) - {"nan","Unknown",""}
+    unique_t_tgt = set(df["tissue_tgt"].dropna().unique()) - {"nan","Unknown",""}
+
+    # Split if there are different tissues between regulators and targets
+    # AND the union of tissues has more than one unique value
+    all_tissues = unique_t_reg | unique_t_tgt
+    do_split = len(all_tissues) > 1 and unique_t_reg != unique_t_tgt
+
+    # Also split if user explicitly set different tissue filters
+    if filter_t_reg and filter_t_tgt and filter_t_reg != filter_t_tgt:
+        do_split = True
 
     if do_split:
-        # Build two separate filtered datasets — one per tissue combination
-        cfg1=copy.deepcopy(cfg)
-        cfg1["filter_tissue_reg"]=filter_t_reg
-        cfg1["filter_tissue_tgt"]=None   # regulator tissue only for pane 1
-        df1=filter_data(BASE_DF.copy(),cfg1)
+        # Determine the two tissue groups to show
+        # Pane 1: edges grouped by regulator tissue
+        # Pane 2: edges grouped by target tissue
+        # Use user-selected tissues if set, otherwise use dominant tissues from data
+        if filter_t_reg:
+            pane1_tissue = filter_t_reg
+            pane1_label  = filter_t_reg + " (Regulator tissue)"
+        else:
+            # Pick most common regulator tissue
+            pane1_tissue = df["tissue_reg"].value_counts().index[0]
+            pane1_label  = pane1_tissue + " (Regulator tissue)"
 
-        cfg2=copy.deepcopy(cfg)
-        cfg2["filter_tissue_reg"]=None
-        cfg2["filter_tissue_tgt"]=filter_t_tgt  # target tissue only for pane 2
-        df2=filter_data(BASE_DF.copy(),cfg2)
+        if filter_t_tgt:
+            pane2_tissue = filter_t_tgt
+            pane2_label  = filter_t_tgt + " (Target tissue)"
+        else:
+            # Pick most common target tissue that differs from pane1
+            tgt_counts = df["tissue_tgt"].value_counts()
+            pane2_tissue = None
+            for t in tgt_counts.index:
+                if t != pane1_tissue:
+                    pane2_tissue = t
+                    break
+            if not pane2_tissue:
+                pane2_tissue = tgt_counts.index[0]
+            pane2_label = pane2_tissue + " (Target tissue)"
+
+        # Build pane 1: filter by regulator tissue
+        cfg1 = copy.deepcopy(cfg)
+        cfg1["filter_tissue_reg"] = pane1_tissue
+        cfg1["filter_tissue_tgt"] = None
+        df1 = filter_data(BASE_DF.copy(), cfg1)
+
+        # Build pane 2: filter by target tissue
+        cfg2 = copy.deepcopy(cfg)
+        cfg2["filter_tissue_reg"] = None
+        cfg2["filter_tissue_tgt"] = pane2_tissue
+        df2 = filter_data(BASE_DF.copy(), cfg2)
 
         G1=build_graph(df1); analysis1=analyze_graph(G1,cfg1)
         G2=build_graph(df2); analysis2=analyze_graph(G2,cfg2)
@@ -878,14 +943,12 @@ def apply_filters(n,stage_single,stage_from,stage_to,filter_reg,filter_tgt,
             }
 
         store1=make_store(G1,analysis1); store2=make_store(G2,analysis2)
-        label1=filter_t_reg+" (Regulator tissue)"
-        label2=filter_t_tgt+" (Target tissue)"
         lbl_style={"display":"block"}
 
         return (el1,stylesheet,layout_cfg,store1,
                 el2,layout_cfg,store2,
                 show_block,{"width":"3px","background":"#e2e8f0","flexShrink":"0"},
-                lbl_style,label1,lbl_style,label2,
+                lbl_style,pane1_label,lbl_style,pane2_label,
                 _stats_panel(G1,analysis1,theme),
                 "Pane 1: "+_topbar_stats(G1,analysis1)+" | Pane 2: "+_topbar_stats(G2,analysis2))
     else:
