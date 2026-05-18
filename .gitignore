@@ -1,7 +1,26 @@
+# Virtual environment & Python
 venv/
 __pycache__/
 *.pyc
-.DS_Store
-grn_output.html
+*.pyo
 .env
+
+# OS files
+.DS_Store
 ~$*
+
+# IDE / tools
+.idea/
+anaconda_projects/
+*.db
+
+# Generated output files
+grn_output.html
+
+# Large result/output data files (prevent accidental commits)
+AF_ALL_RESULTS_COMB_GLOB_v2.xlsx
+IL_ALL_RESULTS_GLOB_v1.wobatchcorr.xlsx
+
+# General — ignore future result dumps at root level (keep data/ folder files)
+/*.xlsx
+/*.xls
