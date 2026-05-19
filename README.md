@@ -32,14 +32,13 @@ eyeNet/
 ├── grn_network.py           # Network graph logic and data loading
 ├── requirements.txt         # Python dependencies
 ├── Procfile                 # Deployment entry point
+├── biogrid.py               # Downloaded BioGRID interaction files and add to network
 ├── data/
 │   ├── Lens_GRN_June_2016_original FOR HACKATHON - Salil Lachke.xlsx  # GRN edge data
 │   ├── MegaTable April 24 2024 for Microarray and RNA Seq Sent to Murali (1).xls  # Microarray + RNA-seq enrichment
 │   ├── LogCPM_FPKM_TPM_FiberEpi120225 USE THIS FEB 13 2025.xls        # FPKM expression values
-│   ├── dataDict.json        # Data dictionary
-│   └── biogridScrape/       # Downloaded BioGRID interaction files
+│   └── dataDict.json        # Data dictionary
 ├── src/
-│   └── biogridScrape.py     # Script to fetch latest BioGRID release
 ├── lib/                     # Frontend JS/CSS libraries (vis.js, tom-select)
 ├── docs/                    # Sphinx documentation scaffold
 └── .github/workflows/       # CI configuration
