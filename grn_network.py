@@ -20,6 +20,28 @@ WONG = {
     "pink":       "#CC79A7",
 }
 
+# =============================================================================
+# Tissue color palette — distinct colors per tissue type (color-blind considered)
+# =============================================================================
+
+TISSUE_COLORS = {
+    "Lens epithelium":                    "#56B4E9",   # sky blue
+    "Lens":                               "#E69F00",   # orange
+    "Fiber cells":                        "#009E73",   # green
+    "fiber cells":                        "#009E73",   # normalize
+    "Lens ectoderm":                      "#CC79A7",   # pink
+    "Retina":                             "#D55E00",   # vermillion
+    "Optic cup":                          "#0072B2",   # blue
+    "Optic vesicle":                      "#F0E442",   # yellow
+    "Transition zone":                    "#994F00",   # brown
+    "Corneal epithelium":                 "#006CD1",   # teal-blue
+    "Lens placode":                       "#E1BE6A",   # gold
+    "Lens vesicle":                       "#40B0A6",   # teal
+    "Lens epithelium (central zone)":     "#5D3A9B",   # purple
+    "Lens epithelium (germinative zone)": "#1AFF1A",   # lime
+}
+DEFAULT_TISSUE_COLOR = "#94a3b8"   # grey for unknown
+
 THEMES = {
     "light": {
         "bgcolor":     "#f8fafc",
@@ -90,11 +112,13 @@ def load_data(config):
     for c in ["regulator","target","perturbation","effect","stage",
               "context","tissue_reg","tissue_tgt"]:
         df[c] = df[c].astype(str).str.strip()
+    # Normalize tissue names
+    df["tissue_reg"] = df["tissue_reg"].replace({
+        "nan":"Unknown","fiber cells":"Fiber cells","None":"Unknown"})
+    df["tissue_tgt"] = df["tissue_tgt"].replace({
+        "nan":"Unknown","fiber cells":"Fiber cells","None":"Unknown"})
     df["effect"]       = df["effect"].replace({"nan":"o","none":"o","None":"o","0":"o"})
     df["perturbation"] = df["perturbation"].replace({"nan":"-","none":"-","None":"-"})
-    # Normalize tissue names
-    df["tissue_reg"] = df["tissue_reg"].replace({"nan":"Unknown","fiber cells":"Fiber cells"})
-    df["tissue_tgt"] = df["tissue_tgt"].replace({"nan":"Unknown","fiber cells":"Fiber cells"})
     def clean_pmid(v):
         try:
             if pd.notna(v): return str(int(float(v)))
@@ -112,20 +136,17 @@ def _compute_relationship(row):
     return "activating" if pert == effect else "inhibiting"
 
 def _find_file(path):
-    """Try the exact path first, then common variations."""
     if os.path.exists(path): return path
     candidates = [
-        path.replace("_"," "),                                    # underscores -> spaces
-        path.replace(" ","_"),                                    # spaces -> underscores
-        path.replace(" ","_").replace("(","").replace(")",""),   # remove parens
+        path.replace("_"," "),
+        path.replace(" ","_"),
+        path.replace(" ","_").replace("(","").replace(")",""),
     ]
     for p in candidates:
         if os.path.exists(p): return p
-    # Last resort: search the data directory by partial name match
-    folder = os.path.dirname(path)
+    folder = os.path.dirname(path) or "."
     basename = os.path.basename(path)
     if os.path.exists(folder):
-        # Try case-insensitive partial match
         needle = basename.lower().replace("_","").replace(" ","")
         for f in os.listdir(folder):
             if f.lower().replace("_","").replace(" ","") == needle:
@@ -135,21 +156,14 @@ def _find_file(path):
     return None
 
 def load_external_data(data_sources: dict) -> dict:
-    """
-    Returns: { source_key -> { gene_symbol -> { col_display_name -> value } } }
-    Supports 'extra_paths' to merge additional files into the same gene lookup.
-    """
     result = {}
     for key, src in data_sources.items():
-        # Collect all (path, symbol_col) pairs to load
         path_list = []
         real_path = _find_file(src.get("path",""))
         if real_path:
             path_list.append((real_path, src.get("symbol_col","Symbol"), 0))
         else:
             print("[WARN] Not found: " + src.get("path",""))
-
-        # Extra paths (e.g. second Excel file for same gene set)
         for ep in src.get("extra_paths", []):
             ep_path = _find_file(ep.get("path",""))
             if ep_path:
@@ -157,59 +171,45 @@ def load_external_data(data_sources: dict) -> dict:
                 path_list.append((ep_path, ep.get("symbol_col","Symbol"), sheet))
             else:
                 print("[WARN] Extra path not found: " + ep.get("path",""))
-
         if not path_list:
             result[key] = {}
             continue
-
         print("[DATA] Loading " + src.get("label",key) + " (" + str(len(path_list)) + " file(s))")
         lookup = {}
         try:
             for item in path_list:
-                file_path, sym_col = item[0], item[1]
-                sheet = item[2] if len(item) > 2 else 0
+                file_path, sym_col, sheet = item[0], item[1], item[2]
                 df = pd.read_excel(file_path, sheet_name=sheet)
                 if sym_col not in df.columns:
-                    print("[WARN] symbol_col '" + sym_col + "' not in " + file_path)
+                    print("[WARN] sym_col '" + sym_col + "' not in " + file_path)
                     print("       Available: " + str(list(df.columns[:8])))
                     continue
-                print("[DATA]   -> " + file_path + " (" + str(len(df)) + " rows, sym_col='" + sym_col + "')")
-                # Confirm symbol col found
-                if sym_col in df.columns:
-                    sample = df[sym_col].dropna().head(3).tolist()
-                    print("[DATA]      sample symbols: " + str(sample))
-                else:
-                    print("[WARN]      sym_col '" + sym_col + "' NOT in columns: " + str(list(df.columns[:6])))
+                print("[DATA]   -> " + file_path + " (" + str(len(df)) + " rows)")
                 for _, row in df.iterrows():
                     sym = str(row.get(sym_col,"")).strip()
                     if not sym or sym == "nan": continue
-                    if sym not in lookup:
-                        lookup[sym] = {}
+                    if sym not in lookup: lookup[sym] = {}
                     gene_data = lookup[sym]
-                    # Extract all section columns from this file
                     for section in src.get("sections",[]):
                         for display_name, excel_col in section.get("columns",{}).items():
-                            if excel_col not in df.columns:
-                                continue  # column not in this file, skip
+                            if excel_col not in df.columns: continue
                             v = row.get(excel_col)
                             try:
                                 gene_data[display_name] = round(float(v),1) if pd.notna(v) else None
                             except:
                                 gene_data[display_name] = str(v) if pd.notna(v) else None
-                    # Extract meta columns from this file
                     for meta_key, excel_col in src.get("meta_cols",{}).items():
                         if excel_col not in df.columns: continue
                         if "_meta_"+meta_key not in gene_data or not gene_data["_meta_"+meta_key]:
                             v = row.get(excel_col)
                             gene_data["_meta_"+meta_key] = str(v) if (v is not None and pd.notna(v)) else ""
-
             result[key] = lookup
             print("[DATA]   Total genes: " + str(len(lookup)))
         except Exception as e:
             print("[WARN] Failed loading " + key + ": " + str(e))
             result[key] = {}
-
     return result
+
 def stage_numeric(stage):
     s = str(stage).strip()
     if s == "Adult": return 100000.0
@@ -248,14 +248,23 @@ def build_graph(df):
     targets    = set(df["target"].unique())
     for node in regulators | targets:
         G.add_node(node, is_reg=(node in regulators), is_tgt=(node in targets))
+
+    # Track primary tissue per node (most common tissue across all edges)
+    node_tissues = {}
     for _, row in df.iterrows():
         reg, tgt  = row["regulator"], row["target"]
         pert, eff = row["perturbation"], row["effect"]
         stg       = row["stage"]
         rel       = row["true_relationship"]
         pmid      = str(row.get("pmid","")).strip()
-        t_reg     = row.get("tissue_reg","")
-        t_tgt     = row.get("tissue_tgt","")
+        t_reg     = row.get("tissue_reg","Unknown")
+        t_tgt     = row.get("tissue_tgt","Unknown")
+        # Track tissues per node
+        if reg not in node_tissues: node_tissues[reg] = []
+        if tgt not in node_tissues: node_tissues[tgt] = []
+        node_tissues[reg].append(t_reg)
+        node_tissues[tgt].append(t_tgt)
+
         if G.has_edge(reg, tgt):
             G[reg][tgt]["perturbations"].append(pert)
             G[reg][tgt]["effects"].append(eff)
@@ -269,6 +278,16 @@ def build_graph(df):
                 perturbations=[pert], effects=[eff], relationships=[rel],
                 stages=[stg], count=1, pmids=[pmid] if pmid else [],
                 tissue_reg=t_reg, tissue_tgt=t_tgt)
+    # Assign primary tissue to each node
+    for node in G.nodes():
+        tissues = node_tissues.get(node, [])
+        if tissues:
+            from collections import Counter as C
+            primary = C(tissues).most_common(1)[0][0]
+        else:
+            primary = "Unknown"
+        G.nodes[node]["primary_tissue"] = primary
+
     return G
 
 def analyze_graph(G, config):
@@ -297,10 +316,10 @@ def analyze_graph(G, config):
     results["components"] = list(nx.weakly_connected_components(G))
     return results
 
-def build_cytoscape_elements(G, analysis, config, ext_data, tissue_tag=""):
+def build_cytoscape_elements(G, analysis, config, ext_data):
     """
-    tissue_tag: optional suffix added to node IDs to allow side-by-side graphs
-    with same gene names but different tissue contexts.
+    Build Cytoscape elements — one node per gene, color by primary tissue.
+    No duplication — tissue filter in sidebar handles tissue separation.
     """
     elements       = []
     feedback_nodes = analysis.get("feedback_nodes", set())
@@ -321,17 +340,25 @@ def build_cytoscape_elements(G, analysis, config, ext_data, tissue_tag=""):
         classes = role_class
         if node in feedback_nodes: classes += " feedback"
 
-        node_id = node + tissue_tag
+        # Get primary tissue for this node (from most common edge)
+        tissue = d.get("primary_tissue", "Unknown")
+        tissue_color = TISSUE_COLORS.get(tissue, DEFAULT_TISSUE_COLOR)
+        tissue_cls   = "tissue-" + tissue.lower().replace(" ","_").replace("(","").replace(")","")
+        classes += " " + tissue_cls
+
         elements.append({
             "data": {
-                "id":        node_id,
-                "label":     node,
-                "role":      role_class,
-                "deg":       deg,
-                "out_deg":   d.get("out_degree", 0),
-                "in_deg":    d.get("in_degree", 0),
-                "feedback":  node in feedback_nodes,
-                "self_loop": node in self_loop_nodes,
+                "id":          node,
+                "label":       node,
+                "gene":        node,
+                "role":        role_class,
+                "deg":         deg,
+                "out_deg":     d.get("out_degree", 0),
+                "in_deg":      d.get("in_degree", 0),
+                "tissue":      tissue,
+                "tissue_color":tissue_color,
+                "feedback":    node in feedback_nodes,
+                "self_loop":   node in self_loop_nodes,
             },
             "classes": classes,
         })
@@ -346,9 +373,11 @@ def build_cytoscape_elements(G, analysis, config, ext_data, tissue_tag=""):
 
         elements.append({
             "data": {
-                "id":         u + tissue_tag + "__" + v + tissue_tag,
-                "source":     u + tissue_tag,
-                "target":     v + tissue_tag,
+                "id":         u + "__" + v,
+                "source":     u,
+                "target":     v,
+                "source_gene":u,
+                "target_gene":v,
                 "rel":        dom,
                 "perts":      sorted(set(data.get("perturbations",[]))),
                 "effs":       sorted(set(data.get("effects",[]))),
@@ -358,9 +387,6 @@ def build_cytoscape_elements(G, analysis, config, ext_data, tissue_tag=""):
                 "feedback":   is_fb,
                 "tissue_reg": data.get("tissue_reg",""),
                 "tissue_tgt": data.get("tissue_tgt",""),
-                # Store original gene names for panel lookup
-                "source_gene": u,
-                "target_gene": v,
             },
             "classes": classes,
         })
