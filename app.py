@@ -243,6 +243,31 @@ GLOBAL_CSS = """
     .sec-dark:hover{background:#1e3055;}
     ::-webkit-scrollbar{width:5px;height:5px;}
     ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
+
+    /* ── Dark theme dropdown overrides ─────────────────────────── */
+    .dark-theme .Select-control {
+        background:#1a2540 !important;
+        border-color:#1e2d4a !important;
+    }
+    .dark-theme .Select-value-label,
+    .dark-theme .Select--single .Select-value .Select-value-label {
+        color:#e2e8f0 !important;
+    }
+    .dark-theme .Select-placeholder { color:#64748b !important; }
+    .dark-theme .Select-input>input  { color:#e2e8f0 !important; background:#1a2540 !important; }
+    .dark-theme .Select-option       { color:#e2e8f0 !important; background:#1a2540 !important; }
+    .dark-theme .Select-option.is-focused  { background:#1e2d4a !important; }
+    .dark-theme .Select-option.is-selected { background:#0f1525 !important; }
+    .dark-theme .Select-menu-outer   { background:#1a2540 !important; border-color:#1e2d4a !important; }
+    .dark-theme .Select-arrow        { border-top-color:#64748b !important; }
+    .dark-theme [class*="singleValue"]{ color:#e2e8f0 !important; }
+    .dark-theme [class*="placeholder"]{ color:#64748b !important; }
+    .dark-theme [class*="option"]     { color:#e2e8f0 !important; background:#1a2540 !important; }
+    .dark-theme [class*="menu"]       { background:#1a2540 !important; border-color:#1e2d4a !important; }
+    .dark-theme [class*="control"]    { background:#1a2540 !important; border-color:#1e2d4a !important; }
+    .dark-theme [class*="Input"] input{ color:#e2e8f0 !important; background:#1a2540 !important; }
+    /* Checklist labels in dark */
+    .dark-theme input[type="checkbox"] { accent-color:#56B4E9; }
 """
 
 INIT_JS = """
@@ -684,6 +709,7 @@ def build_layout(theme="light"):
     legend_overlay,save_btn,zoom_box=build_graph_overlays(theme)
     return html.Div(id="app-container",
         style={"display":"flex","flexDirection":"column","height":"100vh","background":t["bgcolor"],"overflow":"hidden"},
+        className="dark-theme" if theme=="dark" else "",
         children=[
             html.Div(style={"background":t["topbar_bg"],"borderBottom":"1px solid "+t["topbar_bdr"],
                             "padding":"8px 20px","display":"flex","alignItems":"center","gap":"12px","flexShrink":"0"},
