@@ -183,6 +183,7 @@ app = dash.Dash(
 
 GLOBAL_CSS = """
     body{margin:0;font-family:sans-serif;overflow:hidden;}
+    /* Light theme dropdowns */
     .Select-control{background:#fff !important;border-color:#cbd5e1 !important;}
     .Select-value-label,.Select--single .Select-value .Select-value-label{color:#0f172a !important;}
     .Select-placeholder{color:#94a3b8 !important;}
@@ -195,7 +196,26 @@ GLOBAL_CSS = """
     [class*="placeholder"]{color:#94a3b8 !important;}
     [class*="option"]{color:#0f172a !important;background:#fff !important;}
     [class*="menu"]{z-index:9999 !important;background:#fff !important;}
+    [class*="control"]{background:#fff !important;border-color:#cbd5e1 !important;}
     [class*="Input"] input{color:#0f172a !important;}
+
+    /* Dark theme dropdowns */
+    .dark-theme .Select-control{background:#1a2540 !important;border-color:#1e2d4a !important;}
+    .dark-theme .Select-value-label,.dark-theme .Select--single .Select-value .Select-value-label{color:#e2e8f0 !important;}
+    .dark-theme .Select-placeholder{color:#64748b !important;}
+    .dark-theme .Select-input>input{color:#e2e8f0 !important;background:#1a2540 !important;}
+    .dark-theme .Select-option{color:#e2e8f0 !important;background:#1a2540 !important;}
+    .dark-theme .Select-option.is-focused{background:#1e2d4a !important;}
+    .dark-theme .Select-menu-outer{background:#1a2540 !important;border-color:#1e2d4a !important;z-index:9999 !important;}
+    .dark-theme [class*="singleValue"]{color:#e2e8f0 !important;}
+    .dark-theme [class*="placeholder"]{color:#64748b !important;}
+    .dark-theme [class*="option"]{color:#e2e8f0 !important;background:#1a2540 !important;}
+    .dark-theme [class*="option"]:hover{background:#1e2d4a !important;}
+    .dark-theme [class*="menu"]{background:#1a2540 !important;border-color:#1e2d4a !important;z-index:9999 !important;}
+    .dark-theme [class*="control"]{background:#1a2540 !important;border-color:#1e2d4a !important;}
+    .dark-theme [class*="Input"] input{color:#e2e8f0 !important;background:#1a2540 !important;}
+    .dark-theme [class*="ValueContainer"]{background:#1a2540 !important;}
+    .dark-theme [class*="MenuList"]{background:#1a2540 !important;}
 
     #graph-area{flex:1;display:flex;flex-direction:row;overflow:hidden;position:relative;min-height:0;}
 
@@ -203,7 +223,8 @@ GLOBAL_CSS = """
     #legend-panel{
         display:none;margin-bottom:6px;padding:14px 16px;border-radius:10px;font-size:12px;
         box-shadow:0 4px 20px rgba(0,0,0,0.13);min-width:240px;
-        background:#ffffff;border:1px solid #e2e8f0;color:#0f172a;max-height:70vh;overflow-y:auto;
+        background:var(--legend-bg,#ffffff);border:1px solid var(--legend-bdr,#e2e8f0);
+        color:var(--legend-txt,#0f172a);max-height:70vh;overflow-y:auto;
     }
     #legend-btn{
         display:inline-flex;align-items:center;gap:6px;padding:7px 14px;
@@ -245,33 +266,153 @@ GLOBAL_CSS = """
     ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
 
     /* ── Dark theme dropdown overrides ─────────────────────────── */
-    .dark-theme .Select-control {
-        background:#1a2540 !important;
-        border-color:#1e2d4a !important;
+    .dark-theme .Select-control,
+    .dark-theme .Select-menu-outer,
+    .dark-theme .VirtualizedSelectOption {
+        background-color: #1a2540 !important;
+        border-color: #1e2d4a !important;
+        color: #e2e8f0 !important;
     }
     .dark-theme .Select-value-label,
-    .dark-theme .Select--single .Select-value .Select-value-label {
-        color:#e2e8f0 !important;
+    .dark-theme .Select--single .Select-value .Select-value-label,
+    .dark-theme .Select-option,
+    .dark-theme .Select-input > input {
+        color: #e2e8f0 !important;
+        background: #1a2540 !important;
     }
-    .dark-theme .Select-placeholder { color:#64748b !important; }
-    .dark-theme .Select-input>input  { color:#e2e8f0 !important; background:#1a2540 !important; }
-    .dark-theme .Select-option       { color:#e2e8f0 !important; background:#1a2540 !important; }
-    .dark-theme .Select-option.is-focused  { background:#1e2d4a !important; }
-    .dark-theme .Select-option.is-selected { background:#0f1525 !important; }
-    .dark-theme .Select-menu-outer   { background:#1a2540 !important; border-color:#1e2d4a !important; }
-    .dark-theme .Select-arrow        { border-top-color:#64748b !important; }
-    .dark-theme [class*="singleValue"]{ color:#e2e8f0 !important; }
-    .dark-theme [class*="placeholder"]{ color:#64748b !important; }
-    .dark-theme [class*="option"]     { color:#e2e8f0 !important; background:#1a2540 !important; }
-    .dark-theme [class*="menu"]       { background:#1a2540 !important; border-color:#1e2d4a !important; }
-    .dark-theme [class*="control"]    { background:#1a2540 !important; border-color:#1e2d4a !important; }
-    .dark-theme [class*="Input"] input{ color:#e2e8f0 !important; background:#1a2540 !important; }
-    /* Checklist labels in dark */
-    .dark-theme input[type="checkbox"] { accent-color:#56B4E9; }
+    .dark-theme .Select-option.is-focused { background: #1e2d4a !important; }
+    .dark-theme .Select-placeholder { color: #64748b !important; }
+    .dark-theme .Select-arrow { border-top-color: #64748b !important; }
+    /* React-select (Dash 2.x+) dark overrides */
+    .dark-theme [class*="control"]    { background: #1a2540 !important; border-color: #1e2d4a !important; }
+    .dark-theme [class*="singleValue"]{ color: #e2e8f0 !important; }
+    .dark-theme [class*="placeholder"]{ color: #64748b !important; }
+    .dark-theme [class*="menu"]       { background: #1a2540 !important; border-color: #1e2d4a !important; }
+    .dark-theme [class*="option"]     { color: #e2e8f0 !important; background: #1a2540 !important; }
+    .dark-theme [class*="option"]:hover { background: #1e2d4a !important; }
+    .dark-theme [class*="Input"] input{ color: #e2e8f0 !important; background: #1a2540 !important; }
+    .dark-theme [class*="indicatorSeparator"] { background: #1e2d4a !important; }
+    .dark-theme [class*="dropdownIndicator"] svg { fill: #64748b !important; }
 """
 
 INIT_JS = """
 <script>
+// Dark mode dropdown styling
+function applyDropdownTheme(isDark) {
+  var bg    = isDark ? '#1a2540' : '#ffffff';
+  var bdr   = isDark ? '#1e2d4a' : '#cbd5e1';
+  var txt   = isDark ? '#e2e8f0' : '#0f172a';
+  var muted = isDark ? '#64748b' : '#94a3b8';
+  var hover = isDark ? '#1e2d4a' : '#f1f5f9';
+
+  // Dash 4.0 uses button.dash-dropdown as the dropdown container
+  var style = document.getElementById('dropdown-theme-style');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'dropdown-theme-style';
+    document.head.appendChild(style);
+  }
+  // Set CSS variables for legend and other themed elements
+  var root = document.documentElement;
+  if (isDark) {
+    root.style.setProperty('--legend-bg',  '#0f1525');
+    root.style.setProperty('--legend-bdr', '#1e2d4a');
+    root.style.setProperty('--legend-txt', '#e2e8f0');
+  } else {
+    root.style.setProperty('--legend-bg',  '#ffffff');
+    root.style.setProperty('--legend-bdr', '#e2e8f0');
+    root.style.setProperty('--legend-txt', '#0f172a');
+  }
+
+  style.textContent = isDark ? `
+    /* Dropdowns */
+    button.dash-dropdown {
+      background-color: ${bg} !important;
+      border-color: ${bdr} !important;
+      color: ${txt} !important;
+    }
+    .dash-dropdown-value { color: ${txt} !important; }
+    .dash-dropdown-placeholder { color: ${muted} !important; }
+    .dash-dropdown-grid-container { background-color: ${bg} !important; }
+    [data-radix-popper-content-wrapper] { background-color: ${bg} !important; }
+    [role="listbox"] { background-color: ${bg} !important; border-color: ${bdr} !important; }
+    [role="option"] { color: ${txt} !important; background-color: ${bg} !important; }
+    [role="option"]:hover, [role="option"][data-highlighted] { background-color: ${hover} !important; }
+    .dash-dropdown-option { color: ${txt} !important; background-color: ${bg} !important; }
+    .dash-dropdown-option:hover { background-color: ${hover} !important; }
+
+    /* Legend, Save PNG, zoom buttons */
+    #legend-btn {
+      background: ${bg} !important;
+      border-color: ${bdr} !important;
+      color: #56B4E9 !important;
+    }
+    #legend-btn:hover { background: ${hover} !important; }
+    #save-btn {
+      background: ${bg} !important;
+      border-color: ${bdr} !important;
+      color: #56B4E9 !important;
+    }
+    #save-btn:hover { background: ${hover} !important; }
+    #zoom-controls {
+      background: ${bg} !important;
+      border-color: ${bdr} !important;
+    }
+    .zoom-btn { color: ${txt} !important; }
+    .zoom-btn:hover { background: ${hover} !important; }
+    .zoom-sep { background: ${bdr} !important; }
+
+    /* All and X tissue buttons */
+    #tissue-reg-all, #tissue-reg-clear,
+    #tissue-tgt-all, #tissue-tgt-clear {
+      background: ${bg} !important;
+      border-color: ${bdr} !important;
+      color: ${muted} !important;
+    }
+    #tissue-reg-all:hover, #tissue-reg-clear:hover,
+    #tissue-tgt-all:hover, #tissue-tgt-clear:hover {
+      background: ${hover} !important;
+    }
+  ` : `
+    /* Light theme restore */
+    button.dash-dropdown {
+      background-color: ${bg} !important;
+      border-color: ${bdr} !important;
+      color: ${txt} !important;
+    }
+    .dash-dropdown-value { color: ${txt} !important; }
+    [role="listbox"] { background-color: ${bg} !important; }
+    [role="option"] { color: ${txt} !important; background-color: ${bg} !important; }
+    #legend-btn, #save-btn {
+      background: #ffffff !important;
+      border-color: #e2e8f0 !important;
+    }
+    #zoom-controls { background: #ffffff !important; border-color: #e2e8f0 !important; }
+    .zoom-btn { color: #334155 !important; }
+    #tissue-reg-all, #tissue-reg-clear,
+    #tissue-tgt-all, #tissue-tgt-clear {
+      background: #f1f5f9 !important;
+      border-color: #cbd5e1 !important;
+      color: #64748b !important;
+    }
+  `;
+}
+
+// Watch for theme changes — poll every 300ms for className change
+(function() {
+  var lastClass = '';
+  setInterval(function() {
+    var container = document.getElementById('app-container');
+    if (!container) return;
+    var cls = container.className || '';
+    if (cls !== lastClass) {
+      lastClass = cls;
+      var isDark = cls.includes('dark-theme');
+      applyDropdownTheme(isDark);
+    }
+  }, 300);
+})();
+
 // Lock nodes on drag
 (function() {
   function attachCy(elId) {
@@ -770,8 +911,13 @@ app.layout = build_layout("light")
 @app.callback(Output("theme-store","data"),Input("theme-toggle","n_clicks"),State("theme-store","data"),prevent_initial_call=True)
 def toggle_theme(n,cur): return "dark" if cur=="light" else "light"
 
-@app.callback(Output("app-container","children"),Input("theme-store","data"),prevent_initial_call=True)
-def update_theme(theme): return build_layout(theme).children
+@app.callback(
+    Output("app-container","children"),
+    Output("app-container","className"),
+    Input("theme-store","data"),
+    prevent_initial_call=True)
+def update_theme(theme):
+    return build_layout(theme).children, ("dark-theme" if theme=="dark" else "")
 
 @app.callback(
     Output("stage-from","value"),Output("stage-to","value"),Output("stage-single","value"),

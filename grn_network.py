@@ -54,6 +54,8 @@ THEMES = {
         "row_bg":      "#f8fafc",
         "topbar_bg":   "#ffffff",
         "topbar_bdr":  "#e2e8f0",
+        "input_bg":    "#ffffff",
+        "input_bdr":   "#cbd5e1",
     },
     "dark": {
         "bgcolor":     "#0a0e1a",
@@ -66,6 +68,8 @@ THEMES = {
         "row_bg":      "#1a2540",
         "topbar_bg":   "#0f1525",
         "topbar_bdr":  "#1e2d4a",
+        "input_bg":    "#1a2540",
+        "input_bdr":   "#1e2d4a",
     },
 }
 
