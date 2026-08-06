@@ -341,6 +341,13 @@ function applyDropdownTheme(isDark) {
     .dash-dropdown-option { color: ${txt} !important; background-color: ${bg} !important; }
     .dash-dropdown-option:hover { background-color: ${hover} !important; }
 
+    /* Checklist (Relationship filter) */
+    input[type="checkbox"] { accent-color: #56B4E9; }
+    .form-check-label, label { color: ${txt} !important; }
+    /* Dash checklist items */
+    .dash-checklist label { color: ${txt} !important; }
+    .dash-checklist .form-check { background: transparent !important; }
+
     /* Legend, Save PNG, zoom buttons */
     #legend-btn {
       background: ${bg} !important;
@@ -806,7 +813,7 @@ def build_sidebar(theme="light"):
                 dcc.Checklist(id="relationship-filter",
                     options=[{"label":"  Activating","value":"activating"},{"label":"  Inhibiting","value":"inhibiting"},{"label":"  No effect","value":"no_effect"}],
                     value=["activating","inhibiting","no_effect"],style={"marginTop":"6px"},
-                    labelStyle={"display":"block","color":t["text"],"fontSize":"12px","marginBottom":"3px"}),
+                    labelStyle={"display":"block","color":t["text"],"fontSize":"12px","marginBottom":"3px","background":"transparent"}),
                 html.Div("True relationship = Perturbation × Effect",style={"fontSize":"10px","color":t["muted"],"marginTop":"3px","fontFamily":"monospace"}),
             ]),
             html.Hr(style=hr),
@@ -979,7 +986,7 @@ def apply_filters(n,stage_single,stage_from,stage_to,filter_reg,filter_tgt,
                 "filter_regulator":filter_reg,"filter_target":filter_tgt,
                 "filter_tissue_reg":filter_t_reg,"filter_tissue_tgt":filter_t_tgt,
                 "relationships_include":relationships or ["activating","inhibiting","no_effect"],
-                "max_edges":int(max_edges) if max_edges!=9999 else None})
+                "max_edges":None if max_edges in (9999,"9999",None) else int(max_edges)})
 
     df=filter_data(BASE_DF.copy(),cfg)
     if len(df)==0:
