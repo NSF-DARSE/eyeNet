@@ -342,11 +342,22 @@ function applyDropdownTheme(isDark) {
     .dash-dropdown-option:hover { background-color: ${hover} !important; }
 
     /* Checklist (Relationship filter) */
+    .dash-options-list-option {
+      background: transparent !important;
+      border: none !important;
+    }
+    .dash-options-list-option-wrapper {
+      background: transparent !important;
+      border: none !important;
+    }
+    .dash-options-list-option-text {
+      background: transparent !important;
+    }
+    .dash-options-list {
+      background: transparent !important;
+      border: none !important;
+    }
     input[type="checkbox"] { accent-color: #56B4E9; }
-    .form-check-label, label { color: ${txt} !important; }
-    /* Dash checklist items */
-    .dash-checklist label { color: ${txt} !important; }
-    .dash-checklist .form-check { background: transparent !important; }
 
     /* Legend, Save PNG, zoom buttons */
     #legend-btn {
